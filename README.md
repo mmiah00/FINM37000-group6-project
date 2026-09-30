@@ -1,1 +1,1 @@
-# FINM37000--group6-project
+# FINM37000-group6-project
