@@ -17,6 +17,10 @@ The main goal is to answer:
 
 > **How accurately do SOFR futures predict the path of Federal Reserve policy rates?**
 
+### Project Scope
+
+The core objective is to have a complete and reproducible analysis of SOFR-implied Federal Reserve expectations. The core analysis will be completed first, while the intraday FOMC announcement study will serve as an optional extension if time permits.
+
 ## Data
 
 The analysis will use daily market data from approximately 2022 through September 2026.
@@ -29,7 +33,7 @@ The main data sources will include:
 - Effective Federal Funds Rate (EFFR)
 - Realized Federal Reserve rate decisions
 
-The project will primarily use publicly available market and Federal Reserve data.
+The project will primarily use publicly available market and Federal Reserve data. The SOFR futures data will be used to estimate the market-implied policy path, while the FOMC and realized rate data will provide the benchmark against which those expectations are evaluated.
 
 ## Methodology
 
@@ -91,6 +95,15 @@ The final project will produce:
 4. A comparison between the full methodology and a simplified SOFR curve approach.
 5. If completed, an intraday analysis of market reactions to FOMC announcements.
 
-## Project Scope
+## Project Roadmap
 
-The core objective is to have a complete and reproducible analysis of SOFR-implied Federal Reserve expectations. The core analysis will be completed first, while the intraday FOMC announcement study will serve as an optional extension if time permits.
+The project will be developed in the following stages, with detailed tasks and progress tracked through GitHub Issues:
+
+1. Collect and clean SOFR futures data.
+2. Collect FOMC meeting and realized rate data.
+3. Build the SOFR futures pricing framework.
+4. Estimate market-implied Fed rate paths.
+5. Evaluate Fed-path forecast accuracy.
+6. Compare the full model with a simplified curve methodology.
+7. Create final visualizations and analysis.
+8. If time permits, analyze intraday FOMC announcement reactions.
