@@ -1,0 +1,23 @@
+{
+  "rows": 73710,
+  "contracts": 178,
+  "settlements": 72457,
+  "post_expiry_rows_dropped": 107,
+  "duplicate_rows": 0,
+  "rows_without_settlement": 1253,
+  "live_rows_without_settlement": 942,
+  "implausible_prices": 0,
+  "min_settlement_price": 94.305,
+  "max_settlement_price": 99.9525,
+  "large_rate_jumps": 30,
+  "max_abs_rate_move_bp": 103.00000000000011,
+  "stale_price_runs": 3,
+  "expiration_convention_mismatches": 0,
+  "expiration_convention_mismatch_pct": 0.0,
+  "expiry_month_offset_used": {
+    "SR1": 0,
+    "SR3": 3
+  },
+  "contracts_with_intra_life_gaps": 112,
+  "total_intra_life_gap_days": 477
+}

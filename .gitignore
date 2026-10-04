@@ -1,0 +1,16 @@
+# Databento data pulls.
+#
+# Raw pulls are never committed: they are large and Databento's licence
+# restricts redistribution of their data. `data/processed/` is ignored by
+# default for the same licensing reason -- if the group decides the derived
+# settlement series is OK to share, remove that line and commit it so that
+# teammates do not each have to spend credits re-pulling.
+data/raw/
+data/processed/
+.cache/
+
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+.venv/

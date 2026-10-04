@@ -1,0 +1,4 @@
+databento>=0.68
+pandas>=2.2
+numpy>=1.26
+pyarrow>=15
