@@ -1,5 +1,12 @@
 # Pricing the Fed with SOFR Futures
 
+## Project Members
+
+- **Ivy Chan** – Communication Leader
+- **Theo Li** – Design Leader
+- **Maisha Miah** – Tech Leader
+- **Sankalp Yadav** – Design Leader
+
 ## Project Overview
 
 This project studies how accurately SOFR futures prices reflect the market's expectations for future Federal Reserve interest rate decisions.
