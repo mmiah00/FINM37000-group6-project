@@ -33,7 +33,9 @@ The main data sources will include:
 - Effective Federal Funds Rate (EFFR)
 - Realized Federal Reserve rate decisions
 
-The project will primarily use publicly available market and Federal Reserve data. The SOFR futures data will be used to estimate the market-implied policy path, while the FOMC and realized rate data will provide the benchmark against which those expectations are evaluated.
+The core data source is Databento's CME Globex dataset (`GLBX.MDP3`): daily settlement prices for One-Month (SR1) and Three-Month (SR3) SOFR futures, accessed with the course-provided Databento API key. Daily SOFR and EFFR from the New York Fed and the FOMC meeting calendar are free public supplements.
+
+The SOFR futures data will be used to estimate the market-implied policy path, while the FOMC and realized rate data will provide the benchmark against which those expectations are evaluated.
 
 ## Methodology
 
@@ -99,11 +101,33 @@ The final project will produce:
 
 The project will be developed in the following stages, with detailed tasks and progress tracked through GitHub Issues:
 
-1. Collect and clean SOFR futures data.
-2. Collect FOMC meeting and realized rate data.
-3. Build the SOFR futures pricing framework.
-4. Estimate market-implied Fed rate paths.
-5. Evaluate Fed-path forecast accuracy.
-6. Compare the full model with a simplified curve methodology.
-7. Create final visualizations and analysis.
-8. If time permits, analyze intraday FOMC announcement reactions.
+1. Collect and clean SOFR futures data. ([#1](https://github.com/mmiah00/FINM37000-group6-project/issues/1))
+2. Collect FOMC meeting and realized rate data. ([#2](https://github.com/mmiah00/FINM37000-group6-project/issues/2))
+3. Build the SOFR futures pricing framework. ([#3](https://github.com/mmiah00/FINM37000-group6-project/issues/3))
+4. Estimate market-implied Fed rate paths. ([#4](https://github.com/mmiah00/FINM37000-group6-project/issues/4))
+5. Evaluate Fed-path forecast accuracy. ([#5](https://github.com/mmiah00/FINM37000-group6-project/issues/5))
+6. Compare the full model with a simplified curve methodology. ([#6](https://github.com/mmiah00/FINM37000-group6-project/issues/6))
+7. Create final visualizations and analysis. ([#7](https://github.com/mmiah00/FINM37000-group6-project/issues/7))
+8. If time permits, analyze intraday FOMC announcement reactions. ([#8](https://github.com/mmiah00/FINM37000-group6-project/issues/8))
+
+## Team and Issue Ownership
+
+| Member | Role | Issues |
+| --- | --- | --- |
+| Maisha Miah | Tech Leader | [#1](https://github.com/mmiah00/FINM37000-group6-project/issues/1) (Databento data and repo setup) |
+| Ivy Chan | Communication Leader | [#2](https://github.com/mmiah00/FINM37000-group6-project/issues/2), [#7](https://github.com/mmiah00/FINM37000-group6-project/issues/7) |
+| Theo Li | Design Leader | [#3](https://github.com/mmiah00/FINM37000-group6-project/issues/3), [#4](https://github.com/mmiah00/FINM37000-group6-project/issues/4) |
+| Sankalp Yadav | Design Leader | [#5](https://github.com/mmiah00/FINM37000-group6-project/issues/5), [#6](https://github.com/mmiah00/FINM37000-group6-project/issues/6) |
+
+[#8](https://github.com/mmiah00/FINM37000-group6-project/issues/8) is optional and unassigned; whoever is ahead after October 20 can pick it up.
+
+## How to Run
+
+*Planned: no code exists yet. These steps describe how the project is intended to run once each stage is implemented.*
+
+1. Use Python 3.12 or newer.
+2. Install the project dependencies, including the course package [`finm37000`](https://github.com/pattersonem/finm37000-autumn-2026).
+3. Save the course-provided Databento API key in `~/.databento_api_key`, the location the course package reads it from.
+4. Run the stages in roadmap order: data collection, pricing, path estimation, evaluation, and figures.
+
+Check the cost of any Databento request before downloading. Raw Databento data is not committed to the repository.
