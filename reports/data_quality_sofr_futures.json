@@ -1,11 +1,12 @@
 {
   "rows": 73710,
   "contracts": 178,
-  "settlements": 72457,
+  "settlements": 73044,
   "post_expiry_rows_dropped": 107,
   "duplicate_rows": 0,
-  "rows_without_settlement": 1253,
-  "live_rows_without_settlement": 942,
+  "rows_without_settlement": 666,
+  "live_rows_without_settlement": 0,
+  "rows_without_settlement_on_non_trading_days": 464,
   "implausible_prices": 0,
   "min_settlement_price": 94.305,
   "max_settlement_price": 99.9525,
@@ -18,6 +19,6 @@
     "SR1": 0,
     "SR3": 3
   },
-  "contracts_with_intra_life_gaps": 112,
-  "total_intra_life_gap_days": 477
+  "contracts_with_intra_life_gaps": 0,
+  "total_intra_life_gap_days": 0
 }

@@ -336,3 +336,136 @@ def test_to_naive_datetime_normalizes_resolution() -> None:
         result = clean.to_naive_datetime(values)
         assert result.dtype == "datetime64[ns]"
         assert result.iloc[0] == pd.Timestamp("2024-01-02")
+
+
+def _settlement_rows(statistics: pd.DataFrame) -> pd.Series:
+    return statistics["stat_type"] == int(db.StatType.SETTLEMENT_PRICE)
+
+
+def test_actual_but_not_final_settlement_is_kept(
+    sr3_contracts: list[Contract], trade_dates: list[pd.Timestamp]
+) -> None:
+    """CME often publishes `flags == 2` and never a final price.
+
+    Requiring both the final and actual bits discarded roughly 940 real
+    settlements across the project sample.
+    """
+    contracts = sr3_contracts[:1]
+    dates = trade_dates[:1]
+    statistics = make_statistics(contracts, dates, {contracts[0].raw_symbol: [95.0]})
+    # Replace the final settlement with an actual-but-not-final one.
+    final = _settlement_rows(statistics) & (statistics["stat_flags"] == 3)
+    statistics.loc[final, "stat_flags"] = 2
+
+    panel = clean.build_panel(
+        statistics, make_definitions(contracts, [pd.Timestamp("2024-01-02")])
+    )
+    assert panel["settlement_price"].iloc[0] == pytest.approx(95.0)
+    assert bool(panel["settlement_is_final"].iloc[0]) is False
+
+
+def test_final_settlement_is_preferred_over_actual_only(
+    sr3_contracts: list[Contract], trade_dates: list[pd.Timestamp]
+) -> None:
+    """When both are published the final price must win, whatever the order."""
+    contracts = sr3_contracts[:1]
+    dates = trade_dates[:1]
+    statistics = make_statistics(contracts, dates, {contracts[0].raw_symbol: [95.0]})
+    actual_only = statistics.loc[_settlement_rows(statistics) & (statistics["stat_flags"] == 3)].copy()
+    actual_only["stat_flags"] = 2
+    actual_only["price"] = 93.0
+    # Append it *after* the final record so "last wins" alone would pick it.
+    actual_only["ts_event"] = actual_only["ts_event"] + pd.Timedelta(hours=1)
+    statistics = pd.concat([statistics, actual_only], ignore_index=True)
+
+    panel = clean.build_panel(
+        statistics, make_definitions(contracts, [pd.Timestamp("2024-01-02")])
+    )
+    assert panel["settlement_price"].iloc[0] == pytest.approx(95.0)
+    assert bool(panel["settlement_is_final"].iloc[0]) is True
+
+
+def test_non_actual_settlement_is_still_rejected(
+    sr3_contracts: list[Contract], trade_dates: list[pd.Timestamp]
+) -> None:
+    """A price without the actual bit is not a real settlement."""
+    contracts = sr3_contracts[:1]
+    dates = trade_dates[:1]
+    statistics = make_statistics(contracts, dates, {contracts[0].raw_symbol: [95.0]})
+    statistics.loc[_settlement_rows(statistics), "stat_flags"] = 1
+
+    panel = clean.build_panel(
+        statistics, make_definitions(contracts, [pd.Timestamp("2024-01-02")])
+    )
+    assert panel["settlement_price"].isna().all()
+
+
+def test_int64_null_sentinel_does_not_become_open_interest(
+    sr3_contracts: list[Contract], trade_dates: list[pd.Timestamp]
+) -> None:
+    """Databento writes INT64_MAX for an absent quantity."""
+    contracts = sr3_contracts[:1]
+    dates = trade_dates[:1]
+    statistics = make_statistics(contracts, dates, {contracts[0].raw_symbol: [95.0]})
+    is_oi = statistics["stat_type"] == int(db.StatType.OPEN_INTEREST)
+    statistics.loc[is_oi, "quantity"] = clean.INT64_NULL
+
+    panel = clean.build_panel(
+        statistics, make_definitions(contracts, [pd.Timestamp("2024-01-02")])
+    )
+    assert pd.isna(panel["open_interest"].iloc[0])
+
+
+def test_settlement_is_final_is_boolean(
+    clean_inputs: tuple[pd.DataFrame, pd.DataFrame],
+) -> None:
+    panel = clean.build_panel(*clean_inputs)
+    assert panel["settlement_is_final"].dtype == bool
+    assert panel["settlement_is_final"].all()
+
+
+def test_chunk_with_no_final_settlements_still_builds(
+    sr3_contracts: list[Contract], trade_dates: list[pd.Timestamp]
+) -> None:
+    """A chunk in which every settlement is actual-but-not-final must build.
+
+    The empty final-settlement groupby collapses `instrument_id` to object
+    dtype, which used to break the definition join only for such chunks.
+    """
+    prices = {c.raw_symbol: [95.0] * len(trade_dates) for c in sr3_contracts}
+    statistics = make_statistics(sr3_contracts, trade_dates, prices)
+    statistics.loc[
+        (statistics["stat_type"] == int(db.StatType.SETTLEMENT_PRICE))
+        & (statistics["stat_flags"] == 3),
+        "stat_flags",
+    ] = 2
+
+    panel = clean.build_panel(
+        statistics, make_definitions(sr3_contracts, [pd.Timestamp("2024-01-02")])
+    )
+    assert len(panel) == len(sr3_contracts) * len(trade_dates)
+    assert panel["settlement_price"].notna().all()
+    assert not panel["settlement_is_final"].any()
+
+
+def test_holiday_without_settlement_is_not_reported_as_a_gap(
+    sr3_contracts: list[Contract]
+) -> None:
+    """Open interest carries over exchange holidays with no settlement.
+
+    Good Friday 2024-03-29 must not count as missing data.
+    """
+    dates = list(pd.bdate_range("2024-03-27", "2024-04-02"))
+    prices = {c.raw_symbol: [95.0 + 0.01 * i for i in range(len(dates))] for c in sr3_contracts}
+    for c in sr3_contracts:  # no settlement published on Good Friday
+        prices[c.raw_symbol][dates.index(pd.Timestamp("2024-03-29"))] = pd.NA
+
+    statistics = make_statistics(sr3_contracts, dates, prices)
+    definitions = make_definitions(sr3_contracts, [pd.Timestamp("2024-03-27")])
+    report = quality.run_checks(clean.build_panel(statistics, definitions))
+
+    assert report.summary["rows_without_settlement"] == len(sr3_contracts)
+    assert report.summary["live_rows_without_settlement"] == 0
+    assert report.summary["rows_without_settlement_on_non_trading_days"] == len(
+        sr3_contracts
+    )

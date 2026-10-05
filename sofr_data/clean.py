@@ -16,12 +16,33 @@ from sofr_data.contracts import (
 
 logger = logging.getLogger(__name__)
 
-SETTLEMENT_FINAL_ACTUAL_MASK = 0b11
-"""CME MDP3 tag 715 SettlPriceType: bit 0 = final, bit 1 = actual.
+SETTLEMENT_ACTUAL_MASK = 0b10
+"""CME MDP3 tag 715 SettlPriceType, bit 1 = actual.
 
-Masking rather than testing ``stat_flags == 3`` keeps the row if the exchange
-also sets an unrelated higher bit. Preliminary and intraday settlements are
-excluded, since the project needs the price the contract actually settled at.
+An "actual" settlement is a real exchange settlement price rather than a
+rounded or derived one, so this is the minimum bar for using a price at all.
+"""
+
+SETTLEMENT_FINAL_MASK = 0b01
+"""CME MDP3 tag 715 SettlPriceType, bit 0 = final.
+
+Requiring *both* bits (``stat_flags & 0b11 == 0b11``) throws away real data:
+CME frequently publishes an actual-but-not-yet-final settlement (``flags == 2``)
+and never follows it with a final one, which is the normal case for illiquid
+back-month SOFR contracts. Across the 2022-2026 sample that strict filter
+discarded about 940 published settlement prices.
+
+So we require the actual bit and merely *prefer* the final one, recording which
+we used in the `settlement_is_final` column. To restore the strict behaviour,
+filter the panel on that column.
+"""
+
+INT64_NULL = 9223372036854775807
+"""Databento's null sentinel for an absent integer, i.e. `INT64_MAX`.
+
+It appears in the `quantity` field of settlement records. Left unmasked it
+would read as an open interest of 9.2e18 and silently defeat the check for
+live contracts with no settlement.
 """
 
 OUTPUT_COLUMNS = [
@@ -34,6 +55,7 @@ OUTPUT_COLUMNS = [
     "reference_end",
     "expiration",
     "settlement_price",
+    "settlement_is_final",
     "implied_rate",
     "cleared_volume",
     "open_interest",
@@ -110,6 +132,7 @@ def extract_daily_statistics(statistics: pd.DataFrame) -> pd.DataFrame:
                 "instrument_id",
                 "symbol",
                 "settlement_price",
+                "settlement_is_final",
                 "cleared_volume",
                 "open_interest",
             ]
@@ -120,18 +143,40 @@ def extract_daily_statistics(statistics: pd.DataFrame) -> pd.DataFrame:
     frame = frame.sort_values("ts_event")
     keys = ["trade_date", "instrument_id"]
 
-    is_settlement = (frame["stat_type"] == int(db.StatType.SETTLEMENT_PRICE)) & (
-        frame["stat_flags"].fillna(0).astype(int) & SETTLEMENT_FINAL_ACTUAL_MASK
-        == SETTLEMENT_FINAL_ACTUAL_MASK
-    )
-    settlement = (
-        frame.loc[is_settlement]
+    flags = frame["stat_flags"].fillna(0).astype("int64")
+    is_settlement = frame["stat_type"] == int(db.StatType.SETTLEMENT_PRICE)
+    is_actual = is_settlement & (flags & SETTLEMENT_ACTUAL_MASK == SETTLEMENT_ACTUAL_MASK)
+    is_final = is_actual & (flags & SETTLEMENT_FINAL_MASK == SETTLEMENT_FINAL_MASK)
+
+    final = (
+        frame.loc[is_final]
         .groupby(keys, as_index=False)
-        .agg(settlement_price=("price", "last"), symbol=("symbol", "last"))
+        .agg(final_price=("price", "last"), symbol=("symbol", "last"))
+    )
+    actual = (
+        frame.loc[is_actual]
+        .groupby(keys, as_index=False)
+        .agg(actual_price=("price", "last"), symbol_actual=("symbol", "last"))
+    )
+    settlement = final.merge(actual, on=keys, how="outer")
+    # Coerce before combining: a chunk whose price column arrived as object
+    # dtype would otherwise trip pandas' deprecated downcast-on-fillna.
+    for column in ("final_price", "actual_price"):
+        settlement[column] = pd.to_numeric(settlement[column], errors="coerce")
+    settlement["settlement_price"] = settlement["final_price"].fillna(
+        settlement["actual_price"]
+    )
+    settlement["settlement_is_final"] = settlement["final_price"].notna()
+    settlement["symbol"] = settlement["symbol"].fillna(settlement["symbol_actual"])
+    settlement = settlement.drop(
+        columns=["final_price", "actual_price", "symbol_actual"]
     )
 
     def last_quantity(stat_type: db.StatType, name: str) -> pd.DataFrame:
-        subset = frame.loc[frame["stat_type"] == int(stat_type)]
+        subset = frame.loc[frame["stat_type"] == int(stat_type)].copy()
+        subset["quantity"] = subset["quantity"].where(
+            subset["quantity"] != INT64_NULL
+        )
         return subset.groupby(keys, as_index=False).agg(**{name: ("quantity", "last")})
 
     volume = last_quantity(db.StatType.CLEARED_VOLUME, "cleared_volume")
@@ -149,6 +194,21 @@ def extract_daily_statistics(statistics: pd.DataFrame) -> pd.DataFrame:
     return daily.drop(columns="symbol_any")
 
 
+def _normalize_instrument_id(frame: pd.DataFrame) -> pd.DataFrame:
+    """Return a copy with `instrument_id` as plain int64.
+
+    Databento sends `instrument_id` as uint32, but an outer merge in which one
+    side is empty collapses it to object dtype, and `pd.merge_asof` refuses to
+    join `by` keys whose dtypes differ. Pinning the type here keeps that
+    failure from depending on whether a given chunk happened to contain any
+    final settlements.
+    """
+    out = frame.copy()
+    out = out.loc[out["instrument_id"].notna()]
+    out["instrument_id"] = pd.to_numeric(out["instrument_id"]).astype("int64")
+    return out
+
+
 def attach_definitions(
     daily: pd.DataFrame, instruments: pd.DataFrame
 ) -> pd.DataFrame:
@@ -161,9 +221,9 @@ def attach_definitions(
     if daily.empty or instruments.empty:
         return daily.assign(raw_symbol=pd.NA, expiration=pd.NaT)
 
-    left = daily.copy()
+    left = _normalize_instrument_id(daily)
     left["_trade_ts"] = to_naive_datetime(left["trade_date"])
-    right = instruments.copy()
+    right = _normalize_instrument_id(instruments)
     right["_snapshot_ts"] = to_naive_datetime(right["snapshot_date"])
 
     merged = pd.merge_asof(
@@ -225,6 +285,9 @@ def standardize(frame: pd.DataFrame) -> pd.DataFrame:
         out["settlement_price"], errors="coerce"
     ).astype("float64")
     out["implied_rate"] = 100.0 - out["settlement_price"]
+    # `.eq(True)` rather than `.fillna(False)`: it maps missing to False
+    # without pandas' deprecated object-dtype downcasting.
+    out["settlement_is_final"] = out["settlement_is_final"].eq(True)
     for column in ("cleared_volume", "open_interest"):
         out[column] = pd.to_numeric(out[column], errors="coerce").astype("Int64")
 

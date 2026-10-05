@@ -103,8 +103,20 @@ def check_missing_settlements(panel: pd.DataFrame, report: QualityReport) -> Non
     missing = panel["settlement_price"].isna()
     report.add("rows_without_settlement", int(missing.sum()))
 
-    live = missing & (panel["open_interest"].fillna(0) > 0)
+    # Restrict to real trading days. Open interest is carried over exchange
+    # holidays, so a contract can show open interest on Good Friday or July 4
+    # with no settlement published -- that is the calendar, not a data gap.
+    calendar = set(
+        expected_trading_days(panel["trade_date"].min(), panel["trade_date"].max())
+    )
+    is_trading_day = panel["trade_date"].isin(calendar)
+
+    live = missing & (panel["open_interest"].fillna(0) > 0) & is_trading_day
     report.add("live_rows_without_settlement", int(live.sum()))
+    report.add(
+        "rows_without_settlement_on_non_trading_days",
+        int((missing & ~is_trading_day).sum()),
+    )
     if live.any():
         report.add_table(
             "missing_settlement_with_open_interest",
