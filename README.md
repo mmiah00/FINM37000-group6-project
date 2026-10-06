@@ -44,11 +44,13 @@ A key challenge is that SOFR futures contracts do not directly report the expect
 The contracts have different settlement conventions:
 
 - **One-month SOFR futures** settle based on the average SOFR rate during a calendar month.
-- **Three-month SOFR futures** settle based on compounded SOFR over a three-month period.
+- **Three-month SOFR futures** settle based on compounded SOFR over a reference period running from one IMM date to the next (not a calendar quarter).
 
 We will build a curve-fitting procedure that converts these futures prices into an implied path for short-term interest rates. The model will estimate the sequence of Federal Reserve rate changes that best reproduces the observed futures prices while respecting the settlement conventions of each contract.
 
 This allows us to recover the market-implied expected Fed policy path on each trading day in the sample.
+
+The current policy rate is taken from observed data, the SOFR-policy-rate basis is held fixed, and the meeting moves are estimated by regularized least squares on futures price residuals. The full derivation, assumptions, and limitations are in [docs/METHODOLOGY.md](docs/METHODOLOGY.md).
 
 ## Evaluation
 
@@ -63,13 +65,15 @@ For each horizon, we can calculate measures such as:
 - Bias in market expectations
 - Changes in forecast accuracy as the FOMC meeting approaches
 
+Forecast errors are computed on cumulative policy-rate changes through each meeting horizon, so the SOFR-policy-rate basis cancels out. Because futures prices may include risk premia, results are described as market-implied expectations rather than pure forecasts.
+
 As an additional validation exercise, we can compare futures-implied rates with the final realized settlement values of expired contracts.
 
 ## Comparison with a Simplified Approach
 
 We will also compare our methodology with a simplified SOFR curve-building approach similar to the one described in the course materials.
 
-This comparison will help measure the importance of correctly accounting for the timing of FOMC meetings and the exact settlement conventions of SOFR futures.
+This comparison will help measure the importance of correctly accounting for the timing of FOMC meetings and the exact settlement conventions of SOFR futures. Both methods are re-priced through the same SR1/SR3 contract pricing functions so their fits are compared on equal terms.
 
 In particular, we will examine whether a simplified smooth curve fails to capture the **step-like behavior of policy rates around FOMC meetings**.
 
