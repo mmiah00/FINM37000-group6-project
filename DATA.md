@@ -62,7 +62,7 @@ at all; `--refresh` forces a re-fetch.
 
 | File | Contents |
 | --- | --- |
-| `data/processed/sofr_futures_settlements.parquet` | The panel: one row per contract per trade date |
+| `data/processed/sofr_futures_settlements.parquet` | The panel: one row per contract per trade date that has a settlement price |
 | `data/processed/sofr_futures_contracts.parquet` | One row per contract: identifiers, reference period, sample span |
 | `reports/data_quality_sofr_futures.md` | The quality checks, in readable form |
 | `reports/data_quality_sofr_futures.json` | The same summary numbers, for programmatic use |
@@ -92,6 +92,21 @@ products settle on different windows, and the whole project rests on respecting
 that difference, so the window is attached to every row rather than being
 re-derived downstream.
 
+The panel has exactly these columns. Internal working columns
+(`instrument_id`, `symbol`, `expected_expiration_month`) are dropped before
+writing.
+
+**Every row has a settlement price.** The pipeline builds a row for each contract
+and date that appears in the Databento feed, which in the 2022-2026 sample is
+73,710 rows. 666 of them have no settlement price and are not written: 464 fall
+on exchange holidays (Good Friday, Juneteenth, July 4, Labor Day and so on),
+where open interest is carried over but nothing settles, and the other 202 are
+trading days on which the contract has neither a settlement nor open interest.
+The quality checks run on all 73,710 rows first, so the report still counts
+them, and `rows_dropped_no_settlement` in the JSON summary records the number.
+That leaves 73,044 rows, so downstream code does not need to filter on missing
+prices.
+
 ## Contract conventions
 
 Implemented in `sofr_data/contracts.py`.
@@ -104,14 +119,23 @@ equals the contract month.
 > `SR1M4` → `SR1-2024-06`, reference period 2024-06-01 to 2024-06-30,
 > expiration 2024-06-28.
 
-**SR3 — Three-Month SOFR.** Settles on *compounded* daily SOFR over a reference
-quarter running from the third Wednesday of the contract month up to, but not
-including, the third Wednesday three months later. Trading terminates at the
-*end* of that quarter, so the expiration month is the contract month **plus
-three**.
+**SR3 — Three-Month SOFR.** Settles on *compounded* daily SOFR over a
+three-month reference period running from the third Wednesday of the contract
+month up to, but not including, the third Wednesday three months later. Trading
+terminates at the *end* of that period, so the expiration month is the contract
+month **plus three**.
 
 > `SR3Z4` → `SR3-2024-12`, reference period 2024-12-18 to 2025-03-18,
 > expiration 2025-03-18.
+
+**SR3 lists serial months as well as quarterly months.** CME lists SR3 for every
+month, not only March, June, September and December. In this sample 58 of the
+97 SR3 contracts are quarterly and 39 are serial (for example `SR3-2024-07`,
+reference period 2024-07-17 to 2024-10-15). The rule is the same for both, but
+the windows overlap rather than tile: a single date can fall inside up to three
+SR3 windows. Anything that assumes one SR3 contract per period, or that SR3
+windows run from one IMM date to the next, will be wrong for the serial months.
+SR1 windows (calendar months) do tile.
 
 That offset is the easy thing to get backwards, so nothing trusts it blindly.
 The pipeline re-derives each expiration month from the parsed symbol and
@@ -134,7 +158,7 @@ Run automatically; written to `reports/`. Thresholds are in `sofr_data/config.py
 | --- | --- |
 | Coverage | Trade dates missing against a CME calendar (US federal holidays plus Good Friday) |
 | Duplicates | Repeated `(trade_date, contract_id)` |
-| Missing settlements | No final settlement on a day the contract had open interest |
+| Missing settlements | No settlement on a trading day on which the contract had open interest (exchange holidays are excluded, since nothing settles on them) |
 | Price bounds | Settlements outside 80–102, i.e. implied rates outside −2% to 20% |
 | Rate jumps | Day-over-day implied-rate moves above 50bp |
 | Stale prices | Settlements unchanged for 10 or more consecutive trading days |

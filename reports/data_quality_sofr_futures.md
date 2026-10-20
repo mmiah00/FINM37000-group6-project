@@ -1,6 +1,6 @@
 # SOFR futures data quality report
 
-Generated 2026-10-04 20:56 UTC.
+Generated 2026-10-20 20:50 UTC.
 
 ## Summary
 
@@ -25,6 +25,8 @@ Generated 2026-10-04 20:56 UTC.
 | expiry_month_offset_used | {'SR1': 0, 'SR3': 3} |
 | contracts_with_intra_life_gaps | 0 |
 | total_intra_life_gap_days | 0 |
+| rows_delivered | 73044 |
+| rows_dropped_no_settlement | 666 |
 
 ## coverage
 

@@ -21,7 +21,7 @@ def load_settlements(
     start: pd.Timestamp | str | None = None,
     end: pd.Timestamp | str | None = None,
 ) -> pd.DataFrame:
-    """Load the tidy settlement panel, one row per contract per trade date.
+    """Load the tidy settlement panel, one row per priced contract per trade date.
 
     Args:
         roots: Restrict to these product roots, e.g. ``("SR3",)``.

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import pandas as pd
 import pytest
 
@@ -91,7 +93,7 @@ def test_sr3_reference_period_spans_imm_dates() -> None:
     assert end.date().isoformat() == "2025-03-18"
     # The quarter is bounded by consecutive third Wednesdays.
     assert start == third_wednesday(2024, 12)
-    assert end + pd.Timedelta(days=1) == third_wednesday(2025, 3)
+    assert end + timedelta(days=1) == third_wednesday(2025, 3)
 
 
 def test_sr3_reference_periods_tile_without_gaps_or_overlaps() -> None:
@@ -99,7 +101,7 @@ def test_sr3_reference_periods_tile_without_gaps_or_overlaps() -> None:
     quarters = [Contract("SR3", 2024, m) for m in (3, 6, 9, 12)]
     periods = [reference_period(c) for c in quarters]
     for (_, end), (next_start, _) in zip(periods, periods[1:], strict=False):
-        assert next_start == end + pd.Timedelta(days=1)
+        assert next_start == end + timedelta(days=1)
 
 
 def test_sr3_reference_period_is_about_three_months() -> None:
@@ -112,3 +114,21 @@ def test_sr3_reference_period_is_about_three_months() -> None:
 def test_implied_expiration_month_follows_the_convention() -> None:
     assert str(implied_expiration_month(Contract("SR1", 2024, 3))) == "2024-03"
     assert str(implied_expiration_month(Contract("SR3", 2024, 12))) == "2025-03"
+
+
+def test_sr3_serial_months_exist_and_overlap_their_neighbours() -> None:
+    """SR3 also lists non-quarterly (serial) months, with overlapping windows.
+
+    The real 2022-2026 panel has 39 serial-month SR3 contracts among 97, so a
+    contract's window is three months from the third Wednesday of its own
+    month, whatever the month, and consecutive windows overlap rather than tile.
+    """
+    serial = Contract("SR3", 2024, 7)
+    start, end = reference_period(serial)
+    assert start.date().isoformat() == "2024-07-17"
+    assert end.date().isoformat() == "2024-10-15"
+    assert str(implied_expiration_month(serial)) == "2024-10"
+
+    quarterly = Contract("SR3", 2024, 6)
+    q_start, q_end = reference_period(quarterly)
+    assert q_start < start < q_end  # the June quarterly window still covers July's start

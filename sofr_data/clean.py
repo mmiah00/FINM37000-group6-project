@@ -316,6 +316,39 @@ def drop_post_expiry(panel: pd.DataFrame) -> tuple[pd.DataFrame, int]:
     return panel.loc[keep].reset_index(drop=True), int((~keep).sum())
 
 
+def finalize_panel(panel: pd.DataFrame) -> tuple[pd.DataFrame, int]:
+    """Reduce the checked panel to the dataset that is delivered to the model.
+
+    Two things happen here, after the quality checks have seen the full panel:
+
+    - Rows with no settlement price are dropped. They are exchange holidays,
+      on which open interest is carried but nothing settles, and the first
+      listing day of a new contract. They carry no price, and every consumer
+      (alignment, pricing, curve fitting) would otherwise have to remember to
+      filter them. The quality report still counts them.
+    - The columns are cut to `OUTPUT_COLUMNS`, the documented schema. Internal
+      working columns such as `instrument_id`, `symbol` and
+      `expected_expiration_month` are not part of the dataset.
+
+    Returns:
+        The delivered panel and the number of rows dropped for having no price.
+
+    Raises:
+        ValueError: If the result would contain a repeated
+            `(trade_date, contract_id)`, which must never be delivered silently.
+    """
+    if panel.empty:
+        return pd.DataFrame(columns=OUTPUT_COLUMNS), 0
+
+    priced = panel["settlement_price"].notna()
+    delivered = panel.loc[priced, OUTPUT_COLUMNS].reset_index(drop=True)
+
+    if delivered.duplicated(subset=["trade_date", "contract_id"]).any():
+        msg = "duplicate (trade_date, contract_id) rows in the delivered panel"
+        raise ValueError(msg)
+    return delivered, int((~priced).sum())
+
+
 def build_contract_table(panel: pd.DataFrame) -> pd.DataFrame:
     """One row per contract: its identifiers, reference period and sample span."""
     if panel.empty:

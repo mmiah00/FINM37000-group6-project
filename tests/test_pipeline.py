@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import databento as db
 import pandas as pd
 import pytest
@@ -54,7 +56,7 @@ def test_build_panel_takes_the_latest_final_settlement(
         contracts, trade_dates, {contracts[0].raw_symbol: [95.0]}
     )
     revision = statistics.iloc[[1]].copy()
-    revision["ts_event"] = revision["ts_event"] + pd.Timedelta(hours=2)
+    revision["ts_event"] = revision["ts_event"] + timedelta(hours=2)
     revision["price"] = 94.5
     statistics = pd.concat([statistics, revision], ignore_index=True)
 
@@ -375,7 +377,7 @@ def test_final_settlement_is_preferred_over_actual_only(
     actual_only["stat_flags"] = 2
     actual_only["price"] = 93.0
     # Append it *after* the final record so "last wins" alone would pick it.
-    actual_only["ts_event"] = actual_only["ts_event"] + pd.Timedelta(hours=1)
+    actual_only["ts_event"] = actual_only["ts_event"] + timedelta(hours=1)
     statistics = pd.concat([statistics, actual_only], ignore_index=True)
 
     panel = clean.build_panel(
@@ -469,3 +471,66 @@ def test_holiday_without_settlement_is_not_reported_as_a_gap(
     assert report.summary["rows_without_settlement_on_non_trading_days"] == len(
         sr3_contracts
     )
+
+
+def _panel_with_unpriced_days(
+    contracts: list[Contract], trade_dates: list[pd.Timestamp], unpriced: list[int]
+) -> pd.DataFrame:
+    """A built panel in which the given day indices have no settlement price."""
+    prices = {c.raw_symbol: [95.0 + 0.01 * i for i in range(len(trade_dates))] for c in contracts}
+    for c in contracts:
+        for index in unpriced:
+            prices[c.raw_symbol][index] = pd.NA
+    statistics = make_statistics(contracts, trade_dates, prices)
+    definitions = make_definitions(contracts, [trade_dates[0]])
+    return clean.build_panel(statistics, definitions)
+
+
+def test_finalize_panel_drops_rows_without_a_price(
+    sr3_contracts: list[Contract], trade_dates: list[pd.Timestamp]
+) -> None:
+    panel = _panel_with_unpriced_days(sr3_contracts, trade_dates, unpriced=[4, 9])
+    assert panel["settlement_price"].isna().sum() == 2 * len(sr3_contracts)
+
+    delivered, dropped = clean.finalize_panel(panel)
+
+    assert dropped == 2 * len(sr3_contracts)
+    assert len(delivered) == len(panel) - dropped
+    assert delivered["settlement_price"].notna().all()
+    assert delivered["implied_rate"].notna().all()
+
+
+def test_finalize_panel_delivers_exactly_the_documented_columns(
+    clean_inputs: tuple[pd.DataFrame, pd.DataFrame],
+) -> None:
+    """Internal working columns must not leak into the delivered dataset."""
+    panel = clean.build_panel(*clean_inputs)
+    assert {"instrument_id", "symbol", "expected_expiration_month"} <= set(panel.columns)
+
+    delivered, _ = clean.finalize_panel(panel)
+    assert list(delivered.columns) == clean.OUTPUT_COLUMNS
+
+
+def test_finalize_panel_refuses_duplicates(
+    clean_inputs: tuple[pd.DataFrame, pd.DataFrame],
+) -> None:
+    panel = clean.build_panel(*clean_inputs)
+    doubled = pd.concat([panel, panel.iloc[[0]]], ignore_index=True)
+    with pytest.raises(ValueError, match="duplicate"):
+        clean.finalize_panel(doubled)
+
+
+def test_finalize_panel_handles_an_empty_panel() -> None:
+    delivered, dropped = clean.finalize_panel(pd.DataFrame())
+    assert delivered.empty
+    assert dropped == 0
+    assert list(delivered.columns) == clean.OUTPUT_COLUMNS
+
+
+def test_quality_checks_still_see_unpriced_rows_before_finalizing(
+    sr3_contracts: list[Contract], trade_dates: list[pd.Timestamp]
+) -> None:
+    """The report must count what finalize drops, so the checks run first."""
+    panel = _panel_with_unpriced_days(sr3_contracts, trade_dates, unpriced=[4])
+    report = quality.run_checks(panel)
+    assert report.summary["rows_without_settlement"] == len(sr3_contracts)
