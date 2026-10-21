@@ -13,6 +13,7 @@ nothing as long as the cache is intact.
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from pathlib import Path
 
 import databento as db
@@ -63,10 +64,10 @@ def quarter_chunks(
     [('2022-01-15', '2022-04-01'), ('2022-04-01', '2022-07-01'), ('2022-07-01', '2022-07-03')]
     """
     edges = pd.date_range(
-        start.normalize(), (end + pd.Timedelta(days=1)).normalize(), freq="QS"
+        start.normalize(), (end + timedelta(days=1)).normalize(), freq="QS"
     )
-    edges = pd.DatetimeIndex([start.normalize(), *edges, (end + pd.Timedelta(days=1)).normalize()])
-    edges = edges[(edges >= start.normalize()) & (edges <= (end + pd.Timedelta(days=1)).normalize())]
+    edges = pd.DatetimeIndex([start.normalize(), *edges, (end + timedelta(days=1)).normalize()])
+    edges = edges[(edges >= start.normalize()) & (edges <= (end + timedelta(days=1)).normalize())]
     edges = edges.drop_duplicates().sort_values()
     return list(zip(edges[:-1], edges[1:], strict=True))
 
@@ -163,7 +164,7 @@ def fetch_definitions(
                 symbols=config.PARENT_SYMBOL[root],
                 stype_in="parent",
                 start=snapshot.date(),
-                end=(snapshot + pd.Timedelta(days=1)).date(),
+                end=(snapshot + timedelta(days=1)).date(),
             )
             return _store_to_df(store, DEFINITION_COLUMNS)
 
@@ -233,7 +234,7 @@ def estimate_cost(
         A `pd.DataFrame` with one row per (root, schema) and columns
         `records` and `cost_usd`.
     """
-    end_exclusive = (end + pd.Timedelta(days=1)).date()
+    end_exclusive = (end + timedelta(days=1)).date()
     snapshots = month_starts(start, end)
     rows = []
 
@@ -260,7 +261,7 @@ def estimate_cost(
         probe = snapshots[0]
         one_day = {
             "start": probe.date(),
-            "end": (probe + pd.Timedelta(days=1)).date(),
+            "end": (probe + timedelta(days=1)).date(),
         }
         rows.append(
             {

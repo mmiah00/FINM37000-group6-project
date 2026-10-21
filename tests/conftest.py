@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 import databento as db
@@ -44,7 +45,7 @@ def make_definitions(contracts: list[Contract], snapshots: list[pd.Timestamp]) -
                     "raw_symbol": contract.raw_symbol,
                     "instrument_class": str(db.InstrumentClass.FUTURE),
                     "expiration": expiration.tz_localize("UTC"),
-                    "activation": (expiration - pd.Timedelta(days=400)).tz_localize("UTC"),
+                    "activation": (expiration - timedelta(days=400)).tz_localize("UTC"),
                     "snapshot_date": snapshot,
                 }
             )
@@ -74,7 +75,7 @@ def make_statistics(
         for day_index, trade_date in enumerate(trade_dates):
             price = prices[contract.raw_symbol][day_index]
             ts_ref = trade_date.tz_localize("UTC")
-            ts_event = ts_ref + pd.Timedelta(hours=21)
+            ts_event = ts_ref + timedelta(hours=21)
             common = {
                 "ts_ref": ts_ref,
                 "instrument_id": instrument_id,
@@ -84,7 +85,7 @@ def make_statistics(
             rows.append(
                 {
                     **common,
-                    "ts_event": ts_event - pd.Timedelta(minutes=30),
+                    "ts_event": ts_event - timedelta(minutes=30),
                     "price": price + 5.0,
                     "quantity": pd.NA,
                     "stat_type": int(db.StatType.SETTLEMENT_PRICE),

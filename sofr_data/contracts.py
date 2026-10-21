@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import timedelta
 
 import pandas as pd
 
@@ -167,7 +168,7 @@ def third_wednesday(year: int, month: int) -> pd.Timestamp:
     first = pd.Timestamp(year=year, month=month, day=1)
     # Monday=0 ... Wednesday=2.
     days_to_first_wed = (2 - first.dayofweek) % 7
-    return first + pd.Timedelta(days=days_to_first_wed + 14)
+    return first + timedelta(days=days_to_first_wed + 14)
 
 
 def reference_period(contract: Contract) -> tuple[pd.Timestamp, pd.Timestamp]:
@@ -191,7 +192,7 @@ def reference_period(contract: Contract) -> tuple[pd.Timestamp, pd.Timestamp]:
 
     start = third_wednesday(contract.year, contract.month)
     end_month = contract.contract_month_start + pd.DateOffset(months=REFERENCE_MONTHS["SR3"])
-    end = third_wednesday(end_month.year, end_month.month) - pd.Timedelta(days=1)
+    end = third_wednesday(end_month.year, end_month.month) - timedelta(days=1)
     return start, end
 
 

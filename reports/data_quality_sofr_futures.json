@@ -20,5 +20,7 @@
     "SR3": 3
   },
   "contracts_with_intra_life_gaps": 0,
-  "total_intra_life_gap_days": 0
+  "total_intra_life_gap_days": 0,
+  "rows_delivered": 73044,
+  "rows_dropped_no_settlement": 666
 }

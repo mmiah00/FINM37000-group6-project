@@ -169,19 +169,26 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     panel, post_expiry_dropped = clean.drop_post_expiry(panel)
+
+    # The checks run on the full panel, because several of them (missing
+    # settlements, open interest, coverage) need the rows that have no price.
+    # What is written afterwards is the priced, documented-columns dataset.
+    report = quality.run_checks(
+        panel, extra={"post_expiry_rows_dropped": post_expiry_dropped}
+    )
+    panel, unpriced_dropped = clean.finalize_panel(panel)
+    report.add("rows_delivered", len(panel))
+    report.add("rows_dropped_no_settlement", unpriced_dropped)
     contracts = clean.build_contract_table(panel)
 
     panel.to_parquet(config.SETTLEMENTS_PARQUET, index=False)
     panel.to_csv(config.SETTLEMENTS_CSV, index=False)
     contracts.to_parquet(config.CONTRACTS_PARQUET, index=False)
     contracts.to_csv(config.CONTRACTS_CSV, index=False)
-
-    report = quality.run_checks(
-        panel, extra={"post_expiry_rows_dropped": post_expiry_dropped}
-    )
     quality.write_report(report)
 
     print(f"\nWrote {len(panel):,} rows covering {panel['contract_id'].nunique()} contracts")
+    print(f"  ({unpriced_dropped:,} rows with no settlement price were not written; see the report)")
     print(f"  {config.SETTLEMENTS_PARQUET.relative_to(config.REPO_ROOT)}")
     print(f"  {config.CONTRACTS_PARQUET.relative_to(config.REPO_ROOT)}")
     print(f"  {config.QUALITY_REPORT.relative_to(config.REPO_ROOT)}")
