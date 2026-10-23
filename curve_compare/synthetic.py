@@ -1,11 +1,11 @@
-"""Synthetic SOFR / FOMC data for the issue #6 comparison.
+"""Synthetic SOFR and policy path for the issue #6 comparison.
 
-PLACEHOLDER. Everything in this module is a seeded, fully-known fake world:
-a true policy-rate path that only moves on FOMC meeting dates, a daily SOFR
-series built from it, and a strip of SR1 futures settlement prices built
-from that SOFR series. The comparison uses it instead of the repository's
-real-data modules. `full_model.py` and `simple_curve.py` consume the
-`SyntheticWorld` fields below (daily SOFR, SR1 contracts, meeting dates).
+The meeting DATES are real: they come from `fomc_data`'s FOMC calendar.
+Everything else in this module is a seeded, fully-known fake world: the
+moves at those meetings, a daily SOFR series built from that path, and an
+SR1 strip priced from that series with `sofr_pricing.sr1_rate`. Tests use
+this world so they do not need Databento, a network connection, or the
+processed data files. The real-data entry point is `curve_compare.real_data`.
 
 Rates are in PERCENT everywhere (4.25 means 4.25%), matching `sofr_pricing`.
 Meeting moves are in basis points (25 = a 25 bp hike), matching
@@ -29,21 +29,33 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from curve_compare.calendar import meeting_calendar
 from sofr_pricing.pricing import sr1_rate
 
 # A realistic hike-then-hold-then-cut cycle: 5 hikes, 6 holds, 5 cuts, in bp.
+# Sixteen moves line up with the sixteen real meetings from 2024-01-31 through
+# 2025-12-10. The sizes are still synthetic; only the dates are the Fed's.
 DEFAULT_MOVES_BPS = [25, 25, 50, 50, 25, 0, 0, 0, 0, 0, 0, -25, -25, -50, -25, -25]
 
 
 def generate_meeting_dates(start="2024-01-31", n_meetings=16, meetings_per_year=8):
-    """`n_meetings` FOMC decision dates, evenly spaced to average `meetings_per_year` a year.
+    """The next `n_meetings` announcement dates from `fomc_data`, on or after `start`.
 
-    The real schedule is irregular; this is close enough to space 16 meetings
-    over about two years (the real FOMC meets roughly every six weeks).
+    `meetings_per_year` is accepted so older callers still work. It is not a
+    spacing control: the Fed's calendar is not resampled onto an even grid.
     """
-    start = pd.Timestamp(start)
-    spacing_days = round(365 / meetings_per_year)
-    return [start + pd.Timedelta(days=spacing_days * i) for i in range(n_meetings)]
+    if n_meetings < 1:
+        raise ValueError("n_meetings must be positive")
+    if meetings_per_year < 1:
+        raise ValueError("meetings_per_year must be positive")
+    start = pd.Timestamp(start).normalize()
+    chosen = [day for day in meeting_calendar(start=start) if day >= start]
+    if len(chosen) < n_meetings:
+        raise ValueError(
+            f"fomc_data has {len(chosen)} meetings on or after {start.date()}, "
+            f"which is fewer than n_meetings={n_meetings}"
+        )
+    return chosen[:n_meetings]
 
 
 def true_daily_policy_path(dates, meeting_dates, moves_bps, base_rate_pct):

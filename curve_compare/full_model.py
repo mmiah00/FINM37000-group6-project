@@ -16,14 +16,25 @@ unknown; setting the sum of observed and future rates equal to the SR1
 day-weighted average gives ONE linear equation in the month's unknown deltas:
 
     delta * days_from_meeting_to_month_end = avg_rate * days_in_month
-        - sum(observed fixings through the observation date)
+        - day-weighted sum of observed SOFR through the observation date
         - baseline * remaining_days
+
+The observed sum uses `sofr_pricing.get_rate_blocks`. On a series with one
+value per calendar day that is the plain sum. On business-day SOFR, Friday's
+fixing covers Saturday and Sunday. Future days are still one calendar day
+each, at `baseline` before the meeting and `baseline + delta` from the
+meeting date on. The step is on the announcement date, which is the date
+`forecast_eval` scores. `sofr_pricing.effective_date` (the next business
+day) is not used here.
 
 With exactly one meeting in the month this has one unknown and solves
 exactly, which is the usual case (meetings are about six weeks apart).
 """
 
 import pandas as pd
+
+from sofr_pricing.fixing_calendar import MAX_CARRY_DAYS
+from sofr_pricing.pricing import get_rate_blocks
 
 
 def anchor_sofr_rate(daily_sofr, obs_date, meeting_dates, window_days=5):
@@ -42,6 +53,45 @@ def anchor_sofr_rate(daily_sofr, obs_date, meeting_dates, window_days=5):
     observations = daily_sofr.loc[:obs_date] if latest_meeting is None else daily_sofr.loc[latest_meeting:obs_date]
     window = observations.tail(window_days)
     return float(window.mean())
+
+
+def observed_sofr_total(daily_sofr, start, end):
+    """Day-weighted sum of SOFR on the inclusive interval ``[start, end]``.
+
+    The weights come from `sofr_pricing.get_rate_blocks`. A series with one
+    value on every calendar day has nothing to carry forward, so the total
+    equals the plain sum of those values. A business-day series (NY Fed SOFR
+    is published that way) carries each fixing across the following weekend,
+    which is the pricing module's rule. A gap longer than that raises, rather
+    than inventing a rate.
+
+    Returns ``(weighted_sum, n_calendar_days)``.
+    """
+    start = pd.Timestamp(start)
+    end = pd.Timestamp(end)
+    if end < start:
+        return 0.0, 0
+    if not isinstance(daily_sofr.index, pd.DatetimeIndex):
+        raise TypeError("daily SOFR must be indexed by dates")
+    # A short lookback is enough: the fixing in force on `start` is at most one
+    # long weekend earlier. `get_rate_blocks` then walks only this window.
+    history = daily_sofr.sort_index()
+    history = history.loc[start - pd.Timedelta(days=MAX_CARRY_DAYS): end]
+    if len(history) == 0 or history.index[0] > start:
+        raise ValueError(
+            f"daily SOFR starts after {start.date()}; an SR1 month needs a fixing on or before that day"
+        )
+    weighted = 0.0
+    total_days = 0
+    for rate, days in get_rate_blocks(history, start, end):
+        weighted += rate * days
+        total_days += days
+    expected_days = (end - start).days + 1
+    if total_days != expected_days:
+        raise ValueError(
+            f"SOFR day count on {start.date()} to {end.date()} was {total_days}, expected {expected_days}"
+        )
+    return weighted, total_days
 
 
 def recover_full_model_path(sr1_contracts, meeting_dates, baseline_rate, obs_date, daily_sofr):
@@ -64,8 +114,10 @@ def recover_full_model_path(sr1_contracts, meeting_dates, baseline_rate, obs_dat
 
     Raises
     ------
-    ValueError : if a contract month contains multiple unresolved meetings;
-        one monthly average cannot identify their separate moves.
+    ValueError
+        If a contract month contains more than one unresolved meeting (one
+        monthly average cannot separate them), or if `daily_sofr` does not
+        cover an in-progress contract month under `sofr_pricing`'s carry rule.
     """
     obs_date = pd.Timestamp(obs_date)
     meeting_dates = sorted(pd.Timestamp(m) for m in meeting_dates)
@@ -85,13 +137,17 @@ def recover_full_model_path(sr1_contracts, meeting_dates, baseline_rate, obs_dat
             raise ValueError("SR1 contract month must contain exactly one unresolved meeting")
 
         meeting = breakpoints[0]
+        # Calendar days, not business days: SR1 counts every calendar day once.
+        # On a filled calendar this matches a plain sum; see `observed_sofr_total`.
         days_after_meeting = (month_end - meeting).days + 1
-        observed = daily_sofr.loc[month_start:obs_date] if month_start <= obs_date else daily_sofr.iloc[:0]
-        observed_days = (obs_date - month_start).days + 1 if month_start <= obs_date else 0
-        if len(observed) != observed_days:
-            raise ValueError("missing observed daily SOFR fixings in SR1 contract month")
+        if month_start <= obs_date:
+            observed_sum, observed_days = observed_sofr_total(daily_sofr, month_start, obs_date)
+        else:
+            observed_sum, observed_days = 0.0, 0
         remaining_days = days_in_month - observed_days
-        delta = (avg_target * days_in_month - observed.sum() - baseline * remaining_days) / days_after_meeting
+        delta = (
+            avg_target * days_in_month - observed_sum - baseline * remaining_days
+        ) / days_after_meeting
         deltas[meeting] = delta
         baseline += delta
 

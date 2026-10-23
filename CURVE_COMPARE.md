@@ -4,11 +4,20 @@ The `curve_compare` package asks: does explicitly modeling FOMC meeting timing a
 SR1 settlement conventions give a more accurate market-implied Fed rate path than a
 generic smooth curve that ignores FOMC timing?
 
-**Status:** the comparison runs on **synthetic data**. It generates a known, seeded
-policy path and SR1 prices, then recovers the path from those prices. The repository
-contains data collection, pricing, FOMC calendar, and forecast evaluation modules, but
-this comparison does not import them. Real settlements and fitted implied paths are
-not inputs to this demo; see "Pending" for possible integration work.
+**Status:** the default run is still **synthetic prices** on a seeded policy path, so
+the tests need no data files and no network. Three inputs now come from the rest of
+the project:
+
+- Meeting dates come from `fomc_data`'s FOMC calendar.
+- Next-meeting errors are scored by `forecast_eval` (horizon 1 only).
+- SR1 month averages use `sofr_pricing`. On a calendar-day series this matches a
+  plain sum. On business-day SOFR (the NY Fed file has no weekend rows), Friday's
+  fixing covers the weekend, which is `sofr_pricing`'s rule.
+
+A separate script reads the team's processed SR1 settlements, daily SOFR, and
+target-rate decisions when those files are already on disk. It does not fetch
+them. See "Real data" below. SR3, horizons 2-6, and replacing this bootstrap
+with `sofr_pricing.fit_meeting_moves` are still open.
 
 ## Scope
 
@@ -17,8 +26,10 @@ data). Following the professor's check-in feedback to focus on a single contract
 single horizon, this comparison is scoped to:
 
 - **SR1 only** (one-month SOFR futures), not SR3.
-- **Next-meeting horizon only** (horizon 1 in `forecast_eval`'s terms), not horizons 2-6.
-- **Synthetic data** (a seeded, fully-known policy path), not real settlements.
+- **Next-meeting horizon only** (horizon 1 in `forecast_eval`), not horizons 2-6.
+- **Synthetic prices by default** (seeded moves, SOFR, and SR1 prices). The meeting
+  dates are the real calendar. The processed Databento / NY Fed / FRED files are
+  an optional second entry point, not something the tests require.
 
 SR3 and multi-horizon comparisons are natural follow-ups once this scope is validated; see
 "Pending" below. They are not implemented here.
@@ -46,42 +57,65 @@ the elapsed part of the current contract month.
   rather than imported, since the course package depends on `databento` at import time
   and this comparison makes no network calls at runtime.
 
-Both operate in SOFR-rate space (since SR1 settles on SOFR, not the policy rate
-directly); the known constant SOFR-policy spread (`world.spread_pct`, a synthetic-data
-parameter) is subtracted before comparing either method's output to the true policy path.
-A real analysis would have to estimate that spread instead (Section 2 of
-`docs/METHODOLOGY.md`).
+Both operate in SOFR-rate space, because an SR1 price is an average of SOFR.
+`forecast_eval` wants a cumulative change in the policy rate, in basis points, so
+each method's rate at the next meeting is converted before scoring:
+
+```text
+implied change (bp) = (model SOFR at the next meeting - basis - policy rate now) x 100
+```
+
+The basis is fixed first. It is not estimated jointly with the meeting moves
+(those two shift almost every contract the same way). On the synthetic path the
+basis is the known constant `spread_pct`. On real data it is
+`sofr_pricing.estimate_basis`: the average, over recent fixings, of SOFR minus
+the target-range midpoint in force that day. The policy rate "now" is the
+target midpoint after any decision announced on the observation date, which is
+the anchor `forecast_eval` uses, so that day's decision is not part of the
+forecast. `build_forecast_errors` then subtracts the realized cumulative
+change. A constant basis cancels. What remains is the error in the implied move.
 
 ## Definitions
 
-Matching `forecast_eval` (#5, PR #15) and `docs/METHODOLOGY.md` Section 9 (PR #11):
+The quantities match `forecast_eval` (#5) and `docs/METHODOLOGY.md` Section 9.
+Bias, MAE, RMSE, and the weekly day buckets are computed by that package
+(`build_forecast_errors`, `summarize_by_horizon`, `weekly_day_bins`,
+`error_by_days_to_meeting`), at horizon 1 only. This package still chooses
+which rows to show.
 
-- **Next-meeting horizon**: for observation date `t`, the forecast target is the first
-  scheduled FOMC meeting strictly after `t`. A meeting's own decision day is never its own
-  target (that day's price is a nowcast, not a forecast).
-- **Error** = implied policy rate just after the next meeting − true policy rate just
-  after the next meeting, in bp. Positive means the method expected a higher rate than
-  the (synthetic) Fed delivered.
+- **Next-meeting horizon**: for observation date `t`, the target is the first
+  scheduled FOMC meeting strictly after `t`. A meeting's own decision day is never
+  its own target. `forecast_eval` drops that row.
+- **Error** = implied cumulative policy change through the next meeting, minus the
+  realized target-midpoint change at that meeting, in bp. Positive means the method
+  expected a higher rate than the Fed delivered. On the synthetic path this is the
+  same number as "implied policy rate at the meeting, minus the true policy rate."
 - **Bias / MAE / RMSE**: mean error / mean absolute error / root mean squared error
   across observation dates, per method.
+- **Method difference**: simplified-curve error minus full-model error, in bp.
 - **Days to meeting**: calendar days from the observation date to the next meeting,
-  bucketed into weekly bins, to see whether a method's error shrinks as the meeting
-  approaches.
-- **Change vs. hold**: whether the next meeting's realized move was nonzero. The
-  headline check for this issue is whether the simplified curve's error is concentrated
-  around meetings with a rate change, versus holds.
+  in weekly buckets from `forecast_eval`.
+- **Change vs. hold**: whether that meeting's realized move was nonzero. This split
+  is the headline check for Issue #6. It is not `forecast_eval`'s year-regime table,
+  which answers a different question. The bias, MAE, and RMSE inside the split still
+  come from `summarize_by_horizon`.
+- **Worst periods**: the target meetings with the largest simplified-curve MAE.
+  Many days share one outcome, so the meeting is the period, not the day.
 
 ## Synthetic data
 
 `synthetic.py` generates, from one seed:
 
-1. A true policy path: piecewise constant, 16 FOMC meetings over about two years (8 a
-   year), with a hike-then-hold-then-cut pattern (+175 bp over 5 meetings, 6 holds, -150
-   bp over 5 meetings).
-2. Daily SOFR = true policy rate + a small constant spread + seeded daily noise.
-3. SR1 settlement prices: 100 − the day-weighted average daily SOFR for each calendar
-   month, with optional seeded price noise, using `sofr_pricing.sr1_rate` (#3, PR #12)
-   on the synthetic daily SOFR series, which already has one value per calendar day.
+1. Meeting dates: the 16 real announcements from 2024-01-31 through 2025-12-10,
+   read from `fomc_data.fomc_calendar.fetch_fomc_calendar`. The moves at those
+   dates are still made up: five hikes (+175 bp), six holds, five cuts (-150 bp).
+2. Daily SOFR = true policy rate + a small constant spread + seeded daily noise,
+   one value per calendar day.
+3. SR1 settlement prices: `100 - sofr_pricing.sr1_rate` for each calendar month,
+   with optional seeded price noise. On this calendar-day series `sr1_rate` equals
+   the plain average. The same helper, given only business days, carries Friday
+   across the weekend. The bootstrap uses that second behavior when it has to
+   (`observed_sofr_total`); the two agree on the synthetic series.
 
 Because the whole path is known in advance, SR1 prices are built with perfect foresight
 of each contract month (the standard way to validate a curve-fitting method: generate
@@ -89,21 +123,47 @@ prices from a known path, then check that the method recovers it — see Section
 `docs/METHODOLOGY.md`). `tests/test_curve_compare.py` checks that the full model recovers
 the exact true deltas when there is no noise.
 
-## Error before the first meeting
+## Seeded results (real calendar, synthetic prices)
 
-On the seeded demo run, the full model's error is concentrated on the 20 observation
-dates before the first meeting (MAE 13.79 bp, RMSE 16.37 bp), compared with the
-remaining 474 dates (MAE 0.63 bp, RMSE 0.96 bp). Across all 494 dates, its MAE is
-1.17 bp and its RMSE is 3.43 bp. The overall accuracy table includes every date.
+`python -m scripts.run_curve_compare_demo` with seed 0, on 486 business days from
+2024-01-02 through the day before 2025-12-10:
 
-The first meeting (2024-01-31) falls at month end, leaving only one post-meeting day
-in the 31-day January SR1 contract. For observations before that meeting, the bootstrap
-solves its move from the January contract alone: it divides the difference between
-the contract's total implied rate and the observed and baseline rate totals by that
-one remaining meeting day. An error in the January contract's average rate is therefore
-amplified 31 times in the inferred move; an anchor-rate error is amplified by the
-number of unobserved days. Later contracts do not revise this move. A real-data run
-should check how far the sample start precedes the first FOMC meeting it covers.
+| method | n_obs | bias (bp) | MAE (bp) | RMSE (bp) |
+| --- | --- | --- | --- | --- |
+| full_model | 486 | 0.20 | 3.25 | 7.49 |
+| simple_curve | 486 | -2.22 | 12.19 | 16.14 |
+
+| regime | n_obs | full_model MAE (bp) | simple_curve MAE (bp) |
+| --- | --- | --- | --- |
+| change | 294 | 4.56 | 19.23 |
+| hold | 192 | 1.23 | 1.43 |
+
+Mean (simplified - full model) error: -2.42 bp. Mean absolute difference: 12.78 bp.
+
+The simplified curve's MAE is about 13 times larger on meetings that move the
+rate than on holds. The full model's gap is smaller (about 3.7 times) but no
+longer tiny, because the real calendar puts some meetings on the last days of
+the SR1 month. The five worst meetings for the simplified curve are all rate
+changes (2024-05-01, 2024-01-31, 2025-09-17, 2024-06-12, 2024-07-31), with MAE
+from 20 bp to 29 bp. On those same meetings the full model is under 1 bp except
+where the meeting sits at month end.
+
+## Error when the meeting is at month end
+
+The full model's error is still concentrated on 2024-01-31. The 20 observation
+dates before that meeting have MAE 13.79 bp and RMSE 16.37 bp. The other 466
+dates have MAE 2.79 bp and RMSE 6.85 bp. Across all 486 dates the MAE is
+3.25 bp and the RMSE is 7.49 bp. The table above includes every date.
+
+2024-01-31 is the last day of the January contract, so the move is identified
+off a single post-meeting day. The bootstrap divides the contract's rate gap by
+that one day, and a 1 bp error in the month's average becomes about a 31 bp
+error in the move. Later contracts do not revise it. 2024-07-31 is the same
+shape (full-model MAE 15.25 bp on 33 dates). 2025-01-29 and 2025-07-30 are
+only a little better: two or three post-meeting days, and on the January 2025
+hold the full model (MAE 4.66 bp) is worse than the smooth curve (MAE 1.62 bp),
+which never has to name a move. A real-data run should treat late-month
+meetings as poorly identified, not as evidence that the smooth curve is right.
 
 ## Known limitation of the simplified curve
 
@@ -116,15 +176,47 @@ It is not a bug in this port; the course package's own `build_short_rate_curve` 
 same property. A monotone-cubic interpolation would smooth it out but is not what the
 course method does.
 
+## Real data
+
+`python -m scripts.run_curve_compare_real` scores the same two methods on the
+files the team already writes. It does not call Databento, FRED, or the NY Fed,
+and it does not read an API key. Build the files first, from the repository root:
+
+```bash
+python -m scripts.fetch_sofr_futures   # SR1 settlements; needs DATABENTO_API_KEY or ~/.databento_api_key
+python -m scripts.fetch_rate_data      # NY Fed SOFR and the FRED target range
+```
+
+| Input | File | What it is used as |
+| --- | --- | --- |
+| SR1 strip | `data/processed/sofr_futures_settlements.parquet` via `sofr_data.load_settlements(roots=("SR1",))` | That session's settlement prices. The contract window is the panel's `reference_start` / `reference_end` (the SR1 calendar month). |
+| Daily SOFR | `data/processed/sofr_daily.csv` | The anchor and the elapsed fixings inside the current contract month. Not the forecast target. |
+| Realized policy | `data/processed/fomc_meetings.csv` | `change_bps` is the truth `forecast_eval` subtracts. The target-range midpoint is the policy path in the chart. |
+| Meeting dates | `fomc_data.fomc_calendar.fetch_fomc_calendar` | The schedule. A decision file that disagrees with this calendar is rejected. |
+
+If a file is missing, the script names the command that builds it and exits.
+The synthetic demo keeps working. No real-data results table is filled in
+here: this checkout has neither the processed files nor a Databento key.
+
+The full model still steps on the announcement date. `sofr_pricing` prices a
+move from the next business day (`effective_date`). Those two conventions
+differ. Horizon 1 in `forecast_eval` is defined on the announcement date, and
+the synthetic path steps on that same date, so the bootstrap follows the
+announcement date. Switching it is listed under "Pending".
+
 ## Pending
 
-- **Real-data integration**: connect collected SR1 settlements, daily SOFR, and fitted
-  implied paths to the comparison. The demo currently supplies synthetic data in their
-  place.
-- **`fomc_data`**: replace the synthetic meeting schedule with dates from
-  `fomc_data.fomc_calendar.fetch_fomc_calendar` for a real-data comparison.
-- **`forecast_eval`**: this comparison implements only next-meeting, SR1-only horizon
-  logic. A follow-up could feed both implied paths to `forecast_eval` for horizons 1-6.
+- **Run the real script** once `sofr_futures_settlements.parquet`, `sofr_daily.csv`,
+  and `fomc_meetings.csv` are on disk, and paste that table here.
+- **Horizons 2-6.** The implied table currently has only the next meeting.
+  `build_forecast_errors` would score the later meetings if both methods wrote
+  a cumulative change for each of them.
+- **`fit_meeting_moves`.** This bootstrap is still a separate SR1 inversion.
+  Scoring `sofr_pricing.fit_meeting_moves` against the simplified curve would
+  test the project's own estimator.
+- **Effective date.** The step is the announcement date, not
+  `sofr_pricing.effective_date`.
+- **SR3** is out of scope.
 
 ## Usage
 
@@ -141,9 +233,13 @@ summarize_errors(results)   # bias / MAE / RMSE per method, at the next-meeting 
 From the repository root, with Python 3.12 and `pip install -r requirements.txt`:
 
 ```bash
-python -m pytest tests/test_curve_compare.py -v        # unit tests
-python -m scripts.run_curve_compare_demo                # tables on synthetic data
-python -m scripts.run_curve_compare_demo --plot sample_paths.png   # also save both charts
+python -m pytest tests/test_curve_compare.py -v        # unit tests, no network
+python -m scripts.run_curve_compare_demo                # synthetic prices, real FOMC dates
+python -m scripts.run_curve_compare_demo --plot sample_paths.png
+python -m scripts.run_curve_compare_real                # only if the processed files exist
+python -m scripts.run_curve_compare_real --plot sample_paths_real.png
 ```
 
-No network access or data files are needed.
+The tests and the synthetic demo need no network access and no data files.
+The real script needs the three processed files and nothing else; it will not
+try to download them.
