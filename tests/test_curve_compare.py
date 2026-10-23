@@ -328,6 +328,48 @@ def test_unpublished_sofr_does_not_change_real_score_or_plot():
     pd.testing.assert_frame_equal(changed_path, original_path)
 
 
+def test_real_meeting_day_and_publication_lag_use_known_decision_for_anchor():
+    decisions = pd.concat([
+        _sample_decisions(),
+        pd.DataFrame([{
+            "meeting_date": pd.Timestamp("2024-05-01"),
+            "effective_date": pd.NaT,
+            "target_lower_before": 5.00,
+            "target_upper_before": 5.25,
+            "target_lower_after": 5.00,
+            "target_upper_after": 5.25,
+            "change_bps": 0.0,
+            "decision": "hold",
+        }]),
+    ], ignore_index=True)
+    settlements = pd.DataFrame([
+        {
+            "trade_date": day,
+            "reference_start": start,
+            "reference_end": start + pd.offsets.MonthEnd(0),
+            "settlement_price": price,
+        }
+        for day in pd.to_datetime(["2024-03-20", "2024-03-21", "2024-03-22"])
+        for start, price in (
+            (pd.Timestamp("2024-03-01"), 94.75),
+            (pd.Timestamp("2024-04-01"), 94.92),
+            (pd.Timestamp("2024-05-01"), 94.92),
+        )
+    ])
+    sofr = pd.concat([
+        _sample_sofr(),
+        pd.DataFrame({"date": pd.to_datetime(["2024-03-20", "2024-03-21"]), "sofr": [5.33, 5.08]}),
+    ], ignore_index=True)
+    world = world_from_frames(settlements, sofr, decisions)
+
+    for obs_date in pd.to_datetime(["2024-03-20", "2024-03-21", "2024-03-22"]):
+        assert obs_date in world.obs_dates
+        result = compare_at_date(world, obs_date)
+        paths = implied_paths_for_plot(world, obs_date, horizon_days=2)
+        assert pd.notna(result["full_model_error_bps"])
+        assert paths.loc[obs_date, "full_model"] == pytest.approx(5.125, abs=1e-9)
+
+
 def test_real_world_rejects_a_date_off_the_fomc_calendar():
     decisions = _sample_decisions()
     decisions.loc[0, "meeting_date"] = pd.Timestamp("2024-01-30")

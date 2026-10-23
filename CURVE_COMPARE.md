@@ -197,6 +197,9 @@ python -m scripts.fetch_rate_data      # NY Fed SOFR and the FRED target range
 For each settlement date, scoring and plotting use only SOFR fixings published
 by that date. A fixing dated on the settlement day is published the next
 business day, so that day's rate remains forecast inside the SR1 month.
+On a meeting day and until a post-meeting fixing is published, the full
+model's anchor uses pre-meeting fixings plus the announced policy change.
+Once post-meeting fixings are published, they supply the anchor directly.
 Trade dates whose in-progress contract month lacks a covering published
 fixing are excluded.
 

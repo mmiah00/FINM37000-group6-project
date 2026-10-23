@@ -49,7 +49,7 @@ def published_sofr(daily_sofr, obs_date):
     return daily_sofr.loc[:cutoff]
 
 
-def anchor_sofr_rate(daily_sofr, obs_date, meeting_dates, window_days=5):
+def anchor_sofr_rate(daily_sofr, obs_date, meeting_dates, meeting_moves, window_days=5):
     """A short trailing average of `daily_sofr` since the latest meeting.
 
     Used as the bootstrap's starting level `baseline` instead of the single
@@ -63,9 +63,13 @@ def anchor_sofr_rate(daily_sofr, obs_date, meeting_dates, window_days=5):
     obs_date = pd.Timestamp(obs_date)
     daily_sofr = published_sofr(daily_sofr, obs_date)
     latest_meeting = max((pd.Timestamp(m) for m in meeting_dates if pd.Timestamp(m) <= obs_date), default=None)
-    observations = daily_sofr.loc[:obs_date] if latest_meeting is None else daily_sofr.loc[latest_meeting:obs_date]
-    window = observations.tail(window_days)
-    return float(window.mean())
+    if latest_meeting is None:
+        return float(daily_sofr.tail(window_days).mean())
+    post_meeting = daily_sofr.loc[daily_sofr.index > latest_meeting]
+    if not post_meeting.empty:
+        return float(post_meeting.tail(window_days).mean())
+    before_meeting = daily_sofr.loc[daily_sofr.index < latest_meeting]
+    return float(before_meeting.tail(window_days).mean()) + float(meeting_moves.loc[latest_meeting]) / 100.0
 
 
 def observed_sofr_total(daily_sofr, start, end):

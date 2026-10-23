@@ -149,12 +149,17 @@ def basis_on(world, obs_date):
     return float(world.spread_pct)
 
 
+def _anchor_on(world, obs_date, anchor_window_days):
+    moves = realized_decisions(world).set_index("meeting_date")["change_bps"]
+    return anchor_sofr_rate(world.daily_sofr, obs_date, world.meeting_dates, moves, anchor_window_days)
+
+
 def _rates_at_next_meeting(world, obs_date, months_ahead, anchor_window_days):
     """Fit both methods and convert each rate into an implied policy change, in bp."""
     obs_date = pd.Timestamp(obs_date).normalize()
     strip = strip_for(world, obs_date, months_ahead)
     next_meeting = next_meeting_after(world.meeting_dates, obs_date)
-    baseline = anchor_sofr_rate(world.daily_sofr, obs_date, world.meeting_dates, anchor_window_days)
+    baseline = _anchor_on(world, obs_date, anchor_window_days)
     deltas = recover_full_model_path(
         strip, world.meeting_dates, baseline, obs_date, world.daily_sofr
     )
@@ -365,7 +370,7 @@ def implied_paths_for_plot(world, obs_date, horizon_days=240, months_ahead=9, an
     obs_date = pd.Timestamp(obs_date).normalize()
     dates = pd.date_range(obs_date, periods=horizon_days, freq="D")
     strip = strip_for(world, obs_date, months_ahead)
-    baseline = anchor_sofr_rate(world.daily_sofr, obs_date, world.meeting_dates, anchor_window_days)
+    baseline = _anchor_on(world, obs_date, anchor_window_days)
     deltas = recover_full_model_path(
         strip, world.meeting_dates, baseline, obs_date, world.daily_sofr
     )
