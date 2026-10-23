@@ -32,9 +32,21 @@ exactly, which is the usual case (meetings are about six weeks apart).
 """
 
 import pandas as pd
+from pandas.tseries.holiday import USFederalHolidayCalendar
+from pandas.tseries.offsets import CustomBusinessDay
 
 from sofr_pricing.fixing_calendar import MAX_CARRY_DAYS
 from sofr_pricing.pricing import get_rate_blocks
+
+
+_PUBLICATION_DAY = CustomBusinessDay(calendar=USFederalHolidayCalendar())
+
+
+def published_sofr(daily_sofr, obs_date):
+    """SOFR fixings published by the observation date's settlement."""
+    last_publication = _PUBLICATION_DAY.rollback(pd.Timestamp(obs_date).normalize())
+    cutoff = last_publication - _PUBLICATION_DAY
+    return daily_sofr.loc[:cutoff]
 
 
 def anchor_sofr_rate(daily_sofr, obs_date, meeting_dates, window_days=5):
@@ -49,6 +61,7 @@ def anchor_sofr_rate(daily_sofr, obs_date, meeting_dates, window_days=5):
     is a simple stand-in for that here.
     """
     obs_date = pd.Timestamp(obs_date)
+    daily_sofr = published_sofr(daily_sofr, obs_date)
     latest_meeting = max((pd.Timestamp(m) for m in meeting_dates if pd.Timestamp(m) <= obs_date), default=None)
     observations = daily_sofr.loc[:obs_date] if latest_meeting is None else daily_sofr.loc[latest_meeting:obs_date]
     window = observations.tail(window_days)
@@ -120,6 +133,8 @@ def recover_full_model_path(sr1_contracts, meeting_dates, baseline_rate, obs_dat
         cover an in-progress contract month under `sofr_pricing`'s carry rule.
     """
     obs_date = pd.Timestamp(obs_date)
+    daily_sofr = published_sofr(daily_sofr, obs_date)
+    observed_end = obs_date - pd.Timedelta(days=1)
     meeting_dates = sorted(pd.Timestamp(m) for m in meeting_dates)
     contracts = sr1_contracts.sort_values("month_start")
 
@@ -140,8 +155,8 @@ def recover_full_model_path(sr1_contracts, meeting_dates, baseline_rate, obs_dat
         # Calendar days, not business days: SR1 counts every calendar day once.
         # On a filled calendar this matches a plain sum; see `observed_sofr_total`.
         days_after_meeting = (month_end - meeting).days + 1
-        if month_start <= obs_date:
-            observed_sum, observed_days = observed_sofr_total(daily_sofr, month_start, obs_date)
+        if month_start <= observed_end:
+            observed_sum, observed_days = observed_sofr_total(daily_sofr, month_start, observed_end)
         else:
             observed_sum, observed_days = 0.0, 0
         remaining_days = days_in_month - observed_days

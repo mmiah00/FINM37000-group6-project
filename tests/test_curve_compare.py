@@ -293,6 +293,41 @@ def test_real_frames_use_fomc_calendar_and_forecast_eval():
     assert march["month_end"].iloc[0] == pd.Timestamp("2024-03-31")
 
 
+def test_real_dates_without_sofr_coverage_at_month_start_are_excluded():
+    january = pd.DataFrame([
+        {
+            "trade_date": pd.Timestamp("2024-01-16"),
+            "reference_start": start,
+            "reference_end": end,
+            "settlement_price": 94.67,
+        }
+        for start, end in (
+            (pd.Timestamp("2024-01-01"), pd.Timestamp("2024-01-31")),
+            (pd.Timestamp("2024-02-01"), pd.Timestamp("2024-02-29")),
+        )
+    ])
+    world = world_from_frames(pd.concat([january, _sample_settlements()]), _sample_sofr(), _sample_decisions())
+
+    assert pd.Timestamp("2024-01-16") not in world.obs_dates
+    assert pd.Timestamp("2024-02-01") in world.obs_dates
+    assert len(run_comparison(world)) == len(world.obs_dates)
+
+
+def test_unpublished_sofr_does_not_change_real_score_or_plot():
+    world = world_from_frames(_sample_settlements(), _sample_sofr(), _sample_decisions())
+    obs_date = pd.Timestamp("2024-02-20")
+    original = compare_at_date(world, obs_date)
+    original_path = implied_paths_for_plot(world, obs_date, horizon_days=40)
+
+    world.daily_sofr.loc[obs_date] = 9.0
+    changed = compare_at_date(world, obs_date)
+    changed_path = implied_paths_for_plot(world, obs_date, horizon_days=40)
+
+    assert changed["full_model_error_bps"] == pytest.approx(original["full_model_error_bps"])
+    assert changed["simple_curve_error_bps"] == pytest.approx(original["simple_curve_error_bps"])
+    pd.testing.assert_frame_equal(changed_path, original_path)
+
+
 def test_real_world_rejects_a_date_off_the_fomc_calendar():
     decisions = _sample_decisions()
     decisions.loc[0, "meeting_date"] = pd.Timestamp("2024-01-30")

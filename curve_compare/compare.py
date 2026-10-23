@@ -23,7 +23,7 @@ import pandas as pd
 from pandas.tseries.holiday import USFederalHolidayCalendar
 from pandas.tseries.offsets import CustomBusinessDay
 
-from curve_compare.full_model import anchor_sofr_rate, implied_daily_path, recover_full_model_path
+from curve_compare.full_model import anchor_sofr_rate, implied_daily_path, published_sofr, recover_full_model_path
 from curve_compare.simple_curve import simple_curve_path
 from forecast_eval.metrics import (
     build_forecast_errors,
@@ -145,7 +145,7 @@ def basis_on(world, obs_date):
     synthetic spread is a known constant (`world.spread_pct`).
     """
     if getattr(world, "fix_basis", False):
-        return float(estimate_basis(world.daily_sofr, world.decisions, obs_date))
+        return float(estimate_basis(published_sofr(world.daily_sofr, obs_date), world.decisions, obs_date))
     return float(world.spread_pct)
 
 

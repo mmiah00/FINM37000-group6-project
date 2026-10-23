@@ -194,6 +194,12 @@ python -m scripts.fetch_rate_data      # NY Fed SOFR and the FRED target range
 | Realized policy | `data/processed/fomc_meetings.csv` | `change_bps` is the truth `forecast_eval` subtracts. The target-range midpoint is the policy path in the chart. |
 | Meeting dates | `fomc_data.fomc_calendar.fetch_fomc_calendar` | The schedule. A decision file that disagrees with this calendar is rejected. |
 
+For each settlement date, scoring and plotting use only SOFR fixings published
+by that date. A fixing dated on the settlement day is published the next
+business day, so that day's rate remains forecast inside the SR1 month.
+Trade dates whose in-progress contract month lacks a covering published
+fixing are excluded.
+
 If a file is missing, the script names the command that builds it and exits.
 The synthetic demo keeps working. There are no committed processed inputs in
 this worktree: `data/processed/sofr_futures_settlements.parquet`,

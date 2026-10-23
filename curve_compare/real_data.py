@@ -23,6 +23,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from curve_compare.calendar import meeting_calendar
+from curve_compare.full_model import observed_sofr_total, published_sofr
 from fomc_data.clean import validate_fomc_decisions, validate_sofr
 from fomc_data.config import FOMC_CSV, SOFR_CSV
 from sofr_data.dataset import load_settlements
@@ -141,9 +142,16 @@ def _scoreable_dates(panel, meeting_dates, sofr):
         covers = (live["month_start"] <= next_meeting) & (live["month_end"] >= next_meeting)
         if not covers.any():
             continue
-        known = sofr.index[sofr.index <= trade_date]
-        if len(known) == 0 or (trade_date - known[-1]).days > MAX_CARRY_DAYS - 1:
+        known = published_sofr(sofr, trade_date)
+        if known.empty or (trade_date - known.index[-1]).days > MAX_CARRY_DAYS:
             continue
+        month_start = pd.Timestamp(live.loc[covers, "month_start"].iloc[0])
+        observed_end = trade_date - pd.Timedelta(days=1)
+        if month_start <= observed_end:
+            try:
+                observed_sofr_total(known, month_start, observed_end)
+            except ValueError:
+                continue
         kept.append(trade_date)
     return pd.DatetimeIndex(kept)
 
