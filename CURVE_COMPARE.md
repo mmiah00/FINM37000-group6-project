@@ -195,8 +195,12 @@ python -m scripts.fetch_rate_data      # NY Fed SOFR and the FRED target range
 | Meeting dates | `fomc_data.fomc_calendar.fetch_fomc_calendar` | The schedule. A decision file that disagrees with this calendar is rejected. |
 
 If a file is missing, the script names the command that builds it and exits.
-The synthetic demo keeps working. No real-data results table is filled in
-here: this checkout has neither the processed files nor a Databento key.
+The synthetic demo keeps working. There are no committed processed inputs in
+this worktree: `data/processed/sofr_futures_settlements.parquet`,
+`sofr_daily.csv`, and `fomc_meetings.csv` are all absent. Building the SR1
+settlements requires a Databento key, and neither `DATABENTO_API_KEY` nor
+`~/.databento_api_key` is available in this environment. The real comparison
+therefore cannot run here, and no real-data accuracy numbers can be reported.
 
 The full model still steps on the announcement date. `sofr_pricing` prices a
 move from the next business day (`effective_date`). Those two conventions
@@ -206,8 +210,8 @@ announcement date. Switching it is listed under "Pending".
 
 ## Pending
 
-- **Run the real script** once `sofr_futures_settlements.parquet`, `sofr_daily.csv`,
-  and `fomc_meetings.csv` are on disk, and paste that table here.
+- **Run the real script** once the three processed inputs are available, and
+  add its actual accuracy table here.
 - **Horizons 2-6.** The implied table currently has only the next meeting.
   `build_forecast_errors` would score the later meetings if both methods wrote
   a cumulative change for each of them.
@@ -237,7 +241,6 @@ python -m pytest tests/test_curve_compare.py -v        # unit tests, no network
 python -m scripts.run_curve_compare_demo                # synthetic prices, real FOMC dates
 python -m scripts.run_curve_compare_demo --plot sample_paths.png
 python -m scripts.run_curve_compare_real                # only if the processed files exist
-python -m scripts.run_curve_compare_real --plot sample_paths_real.png
 ```
 
 The tests and the synthetic demo need no network access and no data files.

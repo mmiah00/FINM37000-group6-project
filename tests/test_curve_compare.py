@@ -300,7 +300,7 @@ def test_real_world_rejects_a_date_off_the_fomc_calendar():
         world_from_frames(_sample_settlements(), _sample_sofr(), decisions)
 
 
-def test_load_real_world_reads_sr1_through_sofr_data(monkeypatch, tmp_path):
+def test_load_real_world_reads_team_processed_files(monkeypatch, tmp_path):
     panel = _sample_settlements()
 
     def fake_load(roots=None, start=None, end=None):
@@ -312,19 +312,23 @@ def test_load_real_world_reads_sr1_through_sofr_data(monkeypatch, tmp_path):
     fomc_path = tmp_path / "fomc_meetings.csv"
     _sample_sofr().to_csv(sofr_path, index=False)
     _sample_decisions().to_csv(fomc_path, index=False)
+    monkeypatch.setattr("curve_compare.real_data.SOFR_CSV", sofr_path)
+    monkeypatch.setattr("curve_compare.real_data.FOMC_CSV", fomc_path)
 
-    world = load_real_world(sofr_path=sofr_path, decisions_path=fomc_path)
+    world = load_real_world()
     assert fake_load.roots == ("SR1",)
     assert list(world.meeting_dates) == list(meeting_calendar(start="2024-01-31", end="2024-03-20"))
 
 
-def test_missing_real_files_name_the_build_commands(tmp_path):
+def test_missing_real_files_name_the_build_commands(monkeypatch, tmp_path):
+    def missing_settlements(roots=None):
+        raise FileNotFoundError("Build it with python -m scripts.fetch_sofr_futures")
+
+    monkeypatch.setattr("curve_compare.real_data.load_settlements", missing_settlements)
+    monkeypatch.setattr("curve_compare.real_data.SOFR_CSV", tmp_path / "missing_sofr.csv")
+    monkeypatch.setattr("curve_compare.real_data.FOMC_CSV", tmp_path / "missing_fomc.csv")
     with pytest.raises(FileNotFoundError) as exc:
-        load_real_world(
-            settlements_path=tmp_path / "missing.parquet",
-            sofr_path=tmp_path / "missing_sofr.csv",
-            decisions_path=tmp_path / "missing_fomc.csv",
-        )
+        load_real_world()
     message = str(exc.value)
     assert "fetch_sofr_futures" in message
     assert "fetch_rate_data" in message

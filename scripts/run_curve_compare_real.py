@@ -9,21 +9,17 @@ default and does not need these files. This script only reads them:
 Then, from the repository root:
 
     python -m scripts.run_curve_compare_real
-    python -m scripts.run_curve_compare_real --plot sample_paths_real.png
 
 No key is read here. If a processed file is missing, the script says which
 command builds it and exits. Tests never call this script.
 """
 
-import argparse
 import sys
 
 import pandas as pd
 
 from curve_compare import (
     method_difference_bps,
-    plot_error_by_days_to_meeting,
-    plot_sample_paths,
     run_comparison,
     summarize_by_days_to_meeting,
     summarize_by_regime,
@@ -34,10 +30,6 @@ from curve_compare.real_data import load_real_world
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--plot", metavar="PATH", help="also save the sample-paths chart here")
-    args = parser.parse_args()
-
     try:
         world = load_real_world()
     except FileNotFoundError as err:
@@ -83,16 +75,6 @@ def main():
 
     print("Worst target meetings by simplified-curve MAE:")
     print(worst_periods(results), "\n")
-
-    if args.plot:
-        import matplotlib
-        matplotlib.use("Agg")
-
-        sample_date = pd.Timestamp(results["obs_date"].iloc[len(results) // 2])
-        plot_sample_paths(world, sample_date).savefig(args.plot, dpi=150)
-        days_path = args.plot.rsplit(".", 1)[0] + "_by_days.png"
-        plot_error_by_days_to_meeting(results).savefig(days_path, dpi=150)
-        print(f"Saved charts to {args.plot} and {days_path}")
 
 
 if __name__ == "__main__":

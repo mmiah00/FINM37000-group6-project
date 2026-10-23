@@ -38,16 +38,11 @@ from sofr_pricing.pricing import sr1_rate
 DEFAULT_MOVES_BPS = [25, 25, 50, 50, 25, 0, 0, 0, 0, 0, 0, -25, -25, -50, -25, -25]
 
 
-def generate_meeting_dates(start="2024-01-31", n_meetings=16, meetings_per_year=8):
+def generate_meeting_dates(start="2024-01-31", n_meetings=16):
     """The next `n_meetings` announcement dates from `fomc_data`, on or after `start`.
-
-    `meetings_per_year` is accepted so older callers still work. It is not a
-    spacing control: the Fed's calendar is not resampled onto an even grid.
     """
     if n_meetings < 1:
         raise ValueError("n_meetings must be positive")
-    if meetings_per_year < 1:
-        raise ValueError("meetings_per_year must be positive")
     start = pd.Timestamp(start).normalize()
     chosen = [day for day in meeting_calendar(start=start) if day >= start]
     if len(chosen) < n_meetings:
@@ -128,7 +123,6 @@ class SyntheticWorld:
 def generate_synthetic_world(
     start="2024-01-31",
     n_meetings=16,
-    meetings_per_year=8,
     moves_bps=None,
     base_rate_pct=4.50,
     spread_pct=0.03,
@@ -148,7 +142,7 @@ def generate_synthetic_world(
     if len(moves_bps) != n_meetings:
         raise ValueError(f"moves_bps must have length n_meetings ({n_meetings})")
 
-    meeting_dates = generate_meeting_dates(start, n_meetings, meetings_per_year)
+    meeting_dates = generate_meeting_dates(start, n_meetings)
     moves = pd.Series(moves_bps, index=pd.DatetimeIndex(meeting_dates), dtype=float)
 
     first_obs_date = meeting_dates[0] - pd.Timedelta(days=30)

@@ -20,18 +20,14 @@ do not need these files.
 """
 
 from dataclasses import dataclass
-from pathlib import Path
-
 import pandas as pd
 
 from curve_compare.calendar import meeting_calendar
 from fomc_data.clean import validate_fomc_decisions, validate_sofr
 from fomc_data.config import FOMC_CSV, SOFR_CSV
-from sofr_data.config import SETTLEMENTS_PARQUET
 from sofr_data.dataset import load_settlements
 from sofr_pricing.fixing_calendar import MAX_CARRY_DAYS
 
-_SR1_BUILD = "python -m scripts.fetch_sofr_futures"
 _RATES_BUILD = "python -m scripts.fetch_rate_data"
 
 
@@ -52,72 +48,35 @@ class RealWorld:
     obs_dates: pd.DatetimeIndex
     fix_basis: bool = True
 
-    def move_at(self, meeting_date):
-        """Realized target-midpoint change at `meeting_date`, in bp, or 0."""
-        moves = self.decisions.set_index("meeting_date")["change_bps"]
-        key = pd.Timestamp(meeting_date).normalize()
-        if key not in moves.index:
-            return 0.0
-        value = moves.loc[key]
-        return float(value)
-
 
 def _missing(path, command):
     return FileNotFoundError(f"{path} not found.\nBuild it with:\n    {command}")
 
 
-def _read_settlements(path):
-    """SR1 rows from the team panel. The default path goes through `sofr_data`."""
-    if path is None:
-        return load_settlements(roots=("SR1",))
-    path = Path(path)
-    if not path.exists():
-        raise _missing(path, _SR1_BUILD)
-    panel = pd.read_parquet(path)
-    if "root" in panel.columns:
-        panel = panel.loc[panel["root"] == "SR1"].copy()
-    return panel
-
-
-def _read_sofr(path):
-    path = SOFR_CSV if path is None else Path(path)
-    if not Path(path).exists():
-        raise _missing(path, _RATES_BUILD)
-    return validate_sofr(pd.read_csv(path))
-
-
-def _read_decisions(path):
-    path = FOMC_CSV if path is None else Path(path)
-    if not Path(path).exists():
-        raise _missing(path, _RATES_BUILD)
-    frame = pd.read_csv(path)
-    for column in ("meeting_date", "effective_date"):
-        if column in frame.columns:
-            frame[column] = pd.to_datetime(frame[column])
-    return validate_fomc_decisions(frame)
-
-
-def load_real_world(settlements_path=None, sofr_path=None, decisions_path=None):
+def load_real_world():
     """Load a `RealWorld` from processed files.
 
-    Pass a path to read that file instead of the team default. Missing files
-    raise `FileNotFoundError` naming the script that builds them. Every
-    missing input is reported together. This function does not fetch.
+    Missing files raise `FileNotFoundError` naming the script that builds them.
+    Every missing input is reported together. This function does not fetch.
     """
     problems = []
     panel = sofr = decisions = None
     try:
-        panel = _read_settlements(settlements_path)
+        panel = load_settlements(roots=("SR1",))
     except FileNotFoundError as err:
         problems.append(str(err))
-    try:
-        sofr = _read_sofr(sofr_path)
-    except FileNotFoundError as err:
-        problems.append(str(err))
-    try:
-        decisions = _read_decisions(decisions_path)
-    except FileNotFoundError as err:
-        problems.append(str(err))
+    if not SOFR_CSV.exists():
+        problems.append(str(_missing(SOFR_CSV, _RATES_BUILD)))
+    else:
+        sofr = validate_sofr(pd.read_csv(SOFR_CSV))
+    if not FOMC_CSV.exists():
+        problems.append(str(_missing(FOMC_CSV, _RATES_BUILD)))
+    else:
+        decisions = pd.read_csv(FOMC_CSV)
+        for column in ("meeting_date", "effective_date"):
+            if column in decisions.columns:
+                decisions[column] = pd.to_datetime(decisions[column])
+        decisions = validate_fomc_decisions(decisions)
     if problems:
         raise FileNotFoundError("\n\n".join(problems))
     return world_from_frames(panel, sofr, decisions)
