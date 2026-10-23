@@ -38,8 +38,9 @@ SR3 and multi-horizon comparisons are natural follow-ups once this scope is vali
 
 Both methods use one date's strip of SR1 settlement prices to estimate a daily
 SOFR rate path. The full model also uses meeting dates, a recent SOFR anchor
-restricted to fixings since the latest meeting, and all observed fixings in
-the elapsed part of the current contract month.
+based on published fixings after the latest meeting (or earlier fixings adjusted
+by that meeting's known move), and published fixings carried over elapsed days
+of the current contract month.
 
 - **Full model** (`full_model.py`): a step path that can only change on a scheduled FOMC
   meeting date. The size of each step is recovered one contract month at a time (a
@@ -130,15 +131,15 @@ the exact true deltas when there is no noise.
 
 | method | n_obs | bias (bp) | MAE (bp) | RMSE (bp) |
 | --- | --- | --- | --- | --- |
-| full_model | 486 | 0.20 | 3.25 | 7.49 |
+| full_model | 486 | -0.06 | 3.50 | 9.23 |
 | simple_curve | 486 | -2.22 | 12.19 | 16.14 |
 
 | regime | n_obs | full_model MAE (bp) | simple_curve MAE (bp) |
 | --- | --- | --- | --- |
-| change | 294 | 4.56 | 19.23 |
-| hold | 192 | 1.23 | 1.43 |
+| change | 294 | 4.93 | 19.23 |
+| hold | 192 | 1.31 | 1.43 |
 
-Mean (simplified - full model) error: -2.42 bp. Mean absolute difference: 12.78 bp.
+Mean (simplified - full model) error: -2.16 bp. Mean absolute difference: 13.00 bp.
 
 The simplified curve's MAE is about 13 times larger on meetings that move the
 rate than on holds. The full model's gap is smaller (about 3.7 times) but no
@@ -151,17 +152,17 @@ where the meeting sits at month end.
 ## Error when the meeting is at month end
 
 The full model's error is still concentrated on 2024-01-31. The 20 observation
-dates before that meeting have MAE 13.79 bp and RMSE 16.37 bp. The other 466
-dates have MAE 2.79 bp and RMSE 6.85 bp. Across all 486 dates the MAE is
-3.25 bp and the RMSE is 7.49 bp. The table above includes every date.
+dates before that meeting have MAE 14.25 bp and RMSE 16.79 bp. The other 466
+dates have MAE 3.04 bp and RMSE 8.76 bp. Across all 486 dates the MAE is
+3.50 bp and the RMSE is 9.23 bp. The table above includes every date.
 
 2024-01-31 is the last day of the January contract, so the move is identified
 off a single post-meeting day. The bootstrap divides the contract's rate gap by
 that one day, and a 1 bp error in the month's average becomes about a 31 bp
 error in the move. Later contracts do not revise it. 2024-07-31 is the same
-shape (full-model MAE 15.25 bp on 33 dates). 2025-01-29 and 2025-07-30 are
+shape (full-model MAE 19.02 bp on 33 dates). 2025-01-29 and 2025-07-30 are
 only a little better: two or three post-meeting days, and on the January 2025
-hold the full model (MAE 4.66 bp) is worse than the smooth curve (MAE 1.62 bp),
+hold the full model (MAE 5.24 bp) is worse than the smooth curve (MAE 1.62 bp),
 which never has to name a move. A real-data run should treat late-month
 meetings as poorly identified, not as evidence that the smooth curve is right.
 

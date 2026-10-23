@@ -145,13 +145,20 @@ def basis_on(world, obs_date):
     synthetic spread is a known constant (`world.spread_pct`).
     """
     if getattr(world, "fix_basis", False):
-        return float(estimate_basis(published_sofr(world.daily_sofr, obs_date), world.decisions, obs_date))
+        return float(estimate_basis(_available_sofr_on(world, obs_date), world.decisions, obs_date))
     return float(world.spread_pct)
+
+
+def _available_sofr_on(world, obs_date):
+    """Fixings available at settlement; synthetic calendar rates are fully observed."""
+    if getattr(world, "fix_basis", False):
+        return published_sofr(world.daily_sofr, obs_date)
+    return world.daily_sofr.loc[:pd.Timestamp(obs_date).normalize()]
 
 
 def _anchor_on(world, obs_date, anchor_window_days):
     moves = realized_decisions(world).set_index("meeting_date")["change_bps"]
-    return anchor_sofr_rate(world.daily_sofr, obs_date, world.meeting_dates, moves, anchor_window_days)
+    return anchor_sofr_rate(_available_sofr_on(world, obs_date), obs_date, world.meeting_dates, moves, anchor_window_days)
 
 
 def _rates_at_next_meeting(world, obs_date, months_ahead, anchor_window_days):
@@ -161,7 +168,7 @@ def _rates_at_next_meeting(world, obs_date, months_ahead, anchor_window_days):
     next_meeting = next_meeting_after(world.meeting_dates, obs_date)
     baseline = _anchor_on(world, obs_date, anchor_window_days)
     deltas = recover_full_model_path(
-        strip, world.meeting_dates, baseline, obs_date, world.daily_sofr
+        strip, world.meeting_dates, baseline, obs_date, _available_sofr_on(world, obs_date)
     )
     if pd.Timestamp(next_meeting) not in deltas:
         raise ValueError(
@@ -372,7 +379,7 @@ def implied_paths_for_plot(world, obs_date, horizon_days=240, months_ahead=9, an
     strip = strip_for(world, obs_date, months_ahead)
     baseline = _anchor_on(world, obs_date, anchor_window_days)
     deltas = recover_full_model_path(
-        strip, world.meeting_dates, baseline, obs_date, world.daily_sofr
+        strip, world.meeting_dates, baseline, obs_date, _available_sofr_on(world, obs_date)
     )
     basis = basis_on(world, obs_date)
     full_path = implied_daily_path(dates, baseline, deltas) - basis

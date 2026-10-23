@@ -11,12 +11,13 @@ Within one SR1 contract month [month_start, month_end], future days use
 
 where `baseline` is the observed anchor rate plus every delta resolved in
 earlier months. In the observation month, elapsed days instead use their
-observed SOFR fixings. Only meetings strictly after the observation date are
-unknown; setting the sum of observed and future rates equal to the SR1
-day-weighted average gives ONE linear equation in the month's unknown deltas:
+available SOFR fixings, carried across elapsed days. Only meetings strictly
+after the observation date are unknown; setting the sum of elapsed and future
+rates equal to the SR1 day-weighted average gives ONE linear equation in the
+month's unknown deltas:
 
     delta * days_from_meeting_to_month_end = avg_rate * days_in_month
-        - day-weighted sum of observed SOFR through the observation date
+        - day-weighted sum of available SOFR through the day before observation
         - baseline * remaining_days
 
 The observed sum uses `sofr_pricing.get_rate_blocks`. On a series with one
@@ -50,18 +51,20 @@ def published_sofr(daily_sofr, obs_date):
 
 
 def anchor_sofr_rate(daily_sofr, obs_date, meeting_dates, meeting_moves, window_days=5):
-    """A short trailing average of `daily_sofr` since the latest meeting.
+    """Anchor from published post-meeting fixings or prior fixings plus the known move.
 
     Used as the bootstrap's starting level `baseline` instead of the single
     day's SOFR print, so that one day's idiosyncratic noise does not get
     carried, uncorrected, into every later recovered delta (the bootstrap is
     sequential, so an error in the anchor propagates to every later month).
+    `daily_sofr` is the caller's available series. Before any post-meeting
+    fixing is available, the last pre-meeting average is shifted by the
+    meeting's realized policy change.
     docs/METHODOLOGY.md Section 2 similarly fixes the anchor to "the observed
     policy level," i.e. data, not a free parameter; a short trailing average
     is a simple stand-in for that here.
     """
     obs_date = pd.Timestamp(obs_date)
-    daily_sofr = published_sofr(daily_sofr, obs_date)
     latest_meeting = max((pd.Timestamp(m) for m in meeting_dates if pd.Timestamp(m) <= obs_date), default=None)
     if latest_meeting is None:
         return float(daily_sofr.tail(window_days).mean())
@@ -121,7 +124,8 @@ def recover_full_model_path(sr1_contracts, meeting_dates, baseline_rate, obs_dat
     meeting_dates : every scheduled FOMC meeting date (past and future).
     baseline_rate : the anchor rate in force at `obs_date` (see `anchor_sofr_rate`).
     obs_date : the observation date; only meetings strictly after it are unknown.
-    daily_sofr : observed daily SOFR fixings through `obs_date`.
+    daily_sofr : fixings available at `obs_date` settlement; the caller applies
+        the publication cutoff on real data.
 
     Returns
     -------
@@ -137,7 +141,6 @@ def recover_full_model_path(sr1_contracts, meeting_dates, baseline_rate, obs_dat
         cover an in-progress contract month under `sofr_pricing`'s carry rule.
     """
     obs_date = pd.Timestamp(obs_date)
-    daily_sofr = published_sofr(daily_sofr, obs_date)
     observed_end = obs_date - pd.Timedelta(days=1)
     meeting_dates = sorted(pd.Timestamp(m) for m in meeting_dates)
     contracts = sr1_contracts.sort_values("month_start")
