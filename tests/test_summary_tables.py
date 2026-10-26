@@ -62,7 +62,8 @@ def test_export_summary_tables(tmp_path):
                            "meeting_date": ["2025-03-19", "2025-03-19"],
                            "error_bps": [10.0, -10.0],})
 
-    comparison = pd.DataFrame({"full_model_error_bps": [5.0, -5.0],
+    comparison = pd.DataFrame({"meeting_date": ["2025-03-19", "2025-03-19"],
+                               "full_model_error_bps": [5.0, -5.0],
                                "simple_curve_error_bps": [15.0, -15.0]})
 
     export_summary_tables(errors, comparison, output_dir=tmp_path)
@@ -74,3 +75,6 @@ def test_export_summary_tables(tmp_path):
 
     for filename in expected:
         assert (tmp_path / filename).exists()
+
+    model_summary = pd.read_csv(tmp_path / "model_comparison_summary.csv")
+    assert model_summary["n_meetings"].tolist() == [1, 1]
