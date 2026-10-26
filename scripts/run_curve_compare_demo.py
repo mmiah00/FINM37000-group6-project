@@ -1,4 +1,9 @@
-"""Demo of the Issue #6 comparison on SYNTHETIC data (no real SR1 prices yet).
+"""Demo of the Issue #6 comparison on synthetic prices and the real FOMC calendar.
+
+SR1 prices, daily SOFR, and the moves are seeded. Meeting dates come from
+`fomc_data`. Scores come from `forecast_eval` at the next meeting. For the
+team's processed Databento, NY Fed, and FRED files, use
+`python -m scripts.run_curve_compare_real`.
 
 Run from the repository root:
     python -m scripts.run_curve_compare_demo
@@ -24,6 +29,7 @@ from curve_compare import (
     summarize_by_days_to_meeting,
     summarize_by_regime,
     summarize_errors,
+    worst_periods,
 )
 
 
@@ -36,9 +42,14 @@ def main():
     obs_dates = default_obs_dates(world)
     results = run_comparison(world, obs_dates)
 
-    pd.set_option("display.width", 120)
+    pd.set_option("display.width", 160)
+    pd.set_option("display.max_columns", 20)
     pd.set_option("display.float_format", "{:.2f}".format)
-    print("SYNTHETIC DATA - placeholder until #1/#4 produce real SR1 settlements\n")
+    print("SYNTHETIC PRICES on the real FOMC calendar.")
+    print("Meeting dates are fomc_data's. Moves, daily SOFR, and SR1 prices are seeded.")
+    print("Scores go through forecast_eval at the next meeting (horizon 1).")
+    print("For the processed Databento / NY Fed / FRED files, run:")
+    print("    python -m scripts.run_curve_compare_real\n")
     print(f"Meeting dates: {[d.date().isoformat() for d in world.meeting_dates]}")
     print(f"Moves (bp): {world.moves_bps.tolist()}\n")
 
@@ -53,7 +64,10 @@ def main():
 
     diff = method_difference_bps(results)
     print(f"Mean (simplified - full model) error: {diff.mean():.2f} bp")
-    print(f"Mean |simplified - full model| error: {diff.abs().mean():.2f} bp")
+    print(f"Mean |simplified - full model| error: {diff.abs().mean():.2f} bp\n")
+
+    print("Worst target meetings by simplified-curve MAE:")
+    print(worst_periods(results))
 
     if args.plot:
         import matplotlib
