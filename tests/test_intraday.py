@@ -33,7 +33,7 @@ from fomc_intraday.fetch import (
 )
 from fomc_intraday.plots import plot_change_by_horizon, plot_repricing_paths
 from fomc_intraday.snapshots import select_snapshot
-from fomc_intraday.study import market_anchor, run_event_study
+from fomc_intraday.study import fit_announcement, market_anchor, run_event_study
 from sofr_pricing import FitResult
 from fomc_intraday.synthetic import DEMO_SCENARIOS, make_synthetic_minutes
 from fomc_intraday.windows import announcement_window, to_utc
@@ -476,3 +476,36 @@ def test_plots_return_one_panel_per_announcement_and_a_horizon_chart():
     assert len(changes.axes) == 1
     plt.close(paths)
     plt.close(changes)
+
+
+def test_published_sofr_that_starts_inside_the_front_month_is_left_unspliced():
+    """The January 2022 file starts after that SR1 month. The fit still runs.
+
+    Splicing a series that begins after the contract's first day makes the
+    pricer refuse the strip. The announcement is fit again with no splice,
+    and the planted jump still comes back.
+    """
+    bars, _truth = make_synthetic_minutes(
+        "2024-06-12",
+        {"2024-06-12": -5.0, "2024-07-31": -10.0, "2024-09-18": -15.0},
+        {"2024-06-12": -25.0, "2024-07-31": -10.0, "2024-09-18": -20.0},
+        anchor=5.33,
+    )
+    # Inside the June SR1 month, and before the 12 June announcement, so
+    # the splice has rows but they start after 1 June.
+    late = pd.Series(
+        [5.33, 5.33],
+        index=pd.to_datetime(["2024-06-10", "2024-06-11"]),
+    )
+    study = fit_announcement(
+        bars,
+        "2024-06-12",
+        calendar_meeting_dates(),
+        anchor=5.33,
+        basis=0.0,
+        realized_fixings=late,
+    )
+    assert not bool(study.diagnostics["used_realized_fixings"].any())
+    post = study.snapshots.loc[study.snapshots["snapshot"] == "post_1415"]
+    front = post.loc[post["horizon"] == 1].iloc[0]
+    assert abs(float(front["implied_move_bps"]) - (-25.0)) < 0.05

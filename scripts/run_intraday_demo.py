@@ -8,15 +8,16 @@ recovers it. No Databento key and no network.
     python scripts/run_intraday_demo.py
     python scripts/run_intraday_demo.py --out reports/intraday
 
-With bars and daily rates already on disk:
+With bars and daily rates already on disk, write the market study
+somewhere other than the synthetic directory:
 
     python scripts/fetch_rate_data.py
     python scripts/fetch_intraday_sofr.py --dry-run
-    python scripts/run_intraday_demo.py --real --out reports/intraday
+    python scripts/run_intraday_demo.py --real --out reports/intraday/real
 
 `--real` reads `data/processed/sofr_intraday_ohlcv_1m.parquet` plus the
 SOFR and FOMC files from `scripts/fetch_rate_data.py`. It does not
-download anything.
+download anything. The committed market run is `reports/intraday/real/`.
 """
 
 from __future__ import annotations
@@ -40,7 +41,13 @@ from fomc_intraday.plots import (  # noqa: E402
     plot_repricing_paths,
     snapshot_change_table,
 )
-from fomc_intraday.study import load_team_rates, market_anchor, run_event_study, stack_studies  # noqa: E402
+from fomc_intraday.study import (  # noqa: E402
+    fit_announcement,
+    load_team_rates,
+    market_anchor,
+    run_event_study,
+    stack_studies,
+)
 from fomc_intraday.synthetic import make_demo_bars  # noqa: E402
 
 
@@ -120,33 +127,84 @@ def run_synthetic():
     return snapshots, minutes, diagnostics, truths
 
 
+def _fit_one_day(day_iso):
+    """Fit one announcement from the tables the worker was given.
+
+    The pool forks this process, so `_REAL` is the parent's loaded data.
+    """
+    day = pd.Timestamp(day_iso)
+    anchor, basis = market_anchor(day, _REAL["decisions"], _REAL["sofr"])
+    return fit_announcement(
+        _REAL["bars"],
+        day,
+        _REAL["meeting_dates"],
+        anchor,
+        basis=basis,
+        realized_fixings=_REAL["sofr"],
+        label=day.date().isoformat(),
+    )
+
+
 def run_real():
-    """Fit cached minute bars, anchored on the team's daily SOFR and decisions."""
+    """Fit cached minute bars, anchored on the team's daily SOFR and decisions.
+
+    Days are fit in parallel. One fit of a three-hour window is about a
+    minute, and the sample is a few dozen announcements.
+    """
+    import multiprocessing
+    from concurrent.futures import ProcessPoolExecutor
+
     path = processed_path()
     if not path.exists():
         raise FileNotFoundError(
             f"No minute bars at {path}. Run scripts/fetch_intraday_sofr.py after a cost check."
         )
     decisions, sofr = load_team_rates()
-    meeting_dates = calendar_meeting_dates()
     bars = pd.read_parquet(path)
     if bars.empty:
         raise FileNotFoundError(f"{path} is empty.")
+
+    global _REAL
+    _REAL = {
+        "bars": bars,
+        "decisions": decisions,
+        "sofr": sofr,
+        "meeting_dates": calendar_meeting_dates(),
+    }
     dates = pd.to_datetime(bars["announcement_date"]).dt.tz_localize(None).dt.normalize()
+    day_list = [day.date().isoformat() for day in sorted(dates.unique())]
+    workers = min(4, len(day_list))
     studies = []
-    for day in sorted(dates.unique()):
-        anchor, basis = market_anchor(day, decisions, sofr)
-        studies.append(run_event_study(
-            bars,
-            day,
-            meeting_dates,
-            anchor=anchor,
-            basis=basis,
-            realized_fixings=sofr,
-            label=pd.Timestamp(day).date().isoformat(),
-        ))
+    # fork, so the worker sees _REAL without re-running this script.
+    context = multiprocessing.get_context("fork")
+    with ProcessPoolExecutor(max_workers=workers, mp_context=context) as pool:
+        for study in pool.map(_fit_one_day, day_list):
+            spliced = bool(study.diagnostics["used_realized_fixings"].any())
+            note = "SOFR spliced" if spliced else "SOFR not spliced (series does not cover the front month)"
+            print(f"  {study.snapshots['label'].iloc[0]}  {note}", flush=True)
+            studies.append(study)
     snapshots, minutes, diagnostics = stack_studies(studies)
     return snapshots, minutes, diagnostics
+
+
+def _path_labels(snapshots, diagnostics, limit=3):
+    """Up to `limit` fully identified announcements with the largest horizon-1 move.
+
+    The path chart is two or three afternoons. The horizon chart and the
+    tables keep the whole sample. A day that is not full rank stays in
+    the tables and off this chart, because that path is not unique.
+    """
+    post = snapshots.loc[
+        (snapshots["snapshot"] == "post_1600") & (snapshots["horizon"] == 1)
+    ].copy()
+    identified = diagnostics.loc[
+        (diagnostics["snapshot"] == "post_1600") & (diagnostics["fully_identified"].astype(bool))
+    ]
+    ranked = post.loc[post["label"].isin(set(identified["label"]))]
+    if ranked.empty:
+        ranked = post
+    ranked = ranked.assign(abs_move=ranked["delta_cum_bps"].abs())
+    return list(ranked.sort_values("abs_move", ascending=False)["label"].head(limit))
 
 
 def write_outputs(out, snapshots, minutes, diagnostics, synthetic, truths=None):
@@ -154,7 +212,14 @@ def write_outputs(out, snapshots, minutes, diagnostics, synthetic, truths=None):
     directory = Path(out)
     directory.mkdir(parents=True, exist_ok=True)
 
-    paths = plot_repricing_paths(minutes, synthetic=synthetic)
+    path_minutes = minutes
+    if not synthetic:
+        labels = _path_labels(snapshots, diagnostics)
+        path_minutes = minutes.loc[minutes["label"].isin(labels)]
+        # Keep the chart in the same order as the ranking, not file order.
+        path_minutes = path_minutes.copy()
+        path_minutes["label"] = pd.Categorical(path_minutes["label"], categories=labels, ordered=True)
+    paths = plot_repricing_paths(path_minutes, synthetic=synthetic)
     changes = plot_change_by_horizon(snapshots, synthetic=synthetic)
     paths.savefig(directory / "repricing_paths.png", dpi=150)
     changes.savefig(directory / "change_by_horizon.png", dpi=150)

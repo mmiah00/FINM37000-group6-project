@@ -242,6 +242,61 @@ def run_event_study(
     return EventStudy(snapshots, minutes, diagnostics)
 
 
+# splice_realized / the pricer raise these when the published SOFR series
+# does not reach back to the front contract's first day. The team's SOFR
+# file starts on 2022-01-03, and the January 2022 SR1 month starts on
+# 2022-01-01, so 2022-01-26 hits the first of these.
+_UNCOVERED_FIXINGS = (
+    "fixings start",
+    "no realized fixings on or before",
+)
+
+
+def fit_announcement(
+    bars,
+    announcement_date,
+    meeting_dates,
+    anchor,
+    basis=0.0,
+    realized_fixings=None,
+    **kwargs,
+):
+    """Fit one announcement, and drop the SOFR splice when it cannot cover the strip.
+
+    The intraday change is read from futures prices. Published SOFR only
+    fills the days of an in-progress contract that are already fixed. If
+    that series starts after the front contract's first day, splicing it
+    makes the pricer refuse the strip. This fits the same snapshots again
+    with no splice. The basis the caller passed is unchanged. A failure
+    for any other reason is raised.
+    """
+    try:
+        return run_event_study(
+            bars,
+            announcement_date,
+            meeting_dates,
+            anchor,
+            basis=basis,
+            realized_fixings=realized_fixings,
+            **kwargs,
+        )
+    except ValueError as error:
+        uncovered = realized_fixings is not None and any(
+            phrase in str(error) for phrase in _UNCOVERED_FIXINGS
+        )
+        if not uncovered:
+            raise
+        return run_event_study(
+            bars,
+            announcement_date,
+            meeting_dates,
+            anchor,
+            basis=basis,
+            realized_fixings=None,
+            **kwargs,
+        )
+
+
 def load_team_rates(processed_dir=None):
     """Read the daily SOFR series and FOMC decisions the team already collects.
 

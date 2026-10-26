@@ -87,21 +87,32 @@ def plot_change_by_horizon(
 
     name = _name_column(frame)
     fig, axis = plt.subplots(figsize=(8.5, 4.8))
-    for panel_name, panel in frame.groupby(name, sort=False):
+    grouped = list(frame.groupby(name, sort=False))
+    # A full sample is a few dozen lines. A legend entry for each one
+    # covers the chart. The table next to the figure names every date.
+    label_each = len(grouped) <= 8
+    for panel_name, panel in grouped:
         ordered = panel.sort_values("horizon")
         axis.plot(
             ordered["horizon"],
             ordered["delta_cum_bps"],
             marker="o",
-            linewidth=1.4,
-            label=str(panel_name),
+            linewidth=1.2 if label_each else 1.0,
+            alpha=1.0 if label_each else 0.75,
+            label=str(panel_name) if label_each else None,
         )
     axis.axhline(0, color="black", linewidth=0.8)
     axis.set_xlabel("Meeting horizon (1 = the meeting being announced)")
     axis.set_ylabel("Change in implied cumulative policy rate (bp)")
     axis.set_xticks(sorted(frame["horizon"].unique()))
     axis.grid(axis="y", alpha=0.3)
-    axis.legend(loc="best", fontsize=8)
+    if label_each:
+        axis.legend(loc="best", fontsize=8)
+    else:
+        axis.text(
+            0.01, 0.01, "Each line is one announcement. Names are in the table.",
+            transform=axis.transAxes, fontsize=8, color="0.25", va="bottom",
+        )
     clock = snapshot.removeprefix("post_").removeprefix("pre_")
     pretty = f"{clock[:2]}:{clock[2:]}" if len(clock) == 4 and clock.isdigit() else snapshot
     title = f"Announcement-day change by horizon ({pretty} minus 13:55 Eastern)"
