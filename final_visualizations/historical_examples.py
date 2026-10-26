@@ -102,7 +102,9 @@ def plot_notable_meetings(notable):
     ax.invert_yaxis()
     ax.axvline(0, color = COLORS["gray"], linewidth = 1)
 
-    ax.set_xlabel("Forecast error (bp)")
+    # Two bars are a meeting's mean absolute error and two are its signed
+    # mean bias. One axis title has to cover both.
+    ax.set_xlabel("Meeting-level statistic (bp)")
     ax.set_title("Notable FOMC Forecasting Episodes")
     ax.grid(axis = "x", alpha = 0.3)
 

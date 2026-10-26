@@ -37,7 +37,10 @@ def main():
 
         effective_date = decision["effective_date"]
 
-        #holds have no new policy effective date. Evaluate the simplified curve on the next business day instead.
+        # Holds have no new policy effective date, so use the next business day.
+        # On every meeting, including ones that change the target, the
+        # simplified forward is read on this effective date, not on the
+        # announcement date.
         if pd.isna(effective_date):
             effective_date = meeting_date + pd.offsets.BDay(1)
 

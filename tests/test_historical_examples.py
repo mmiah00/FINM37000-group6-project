@@ -57,6 +57,8 @@ def test_plot_notable_meetings(sample_errors):
 
     assert isinstance(fig, matplotlib.figure.Figure)
     assert len(fig.axes) == 1
+    # The bars mix mean absolute error and signed bias.
+    assert fig.axes[0].get_xlabel() == "Meeting-level statistic (bp)"
 
 
 def test_insufficient_observations(sample_errors):

@@ -7,12 +7,11 @@ import matplotlib
 matplotlib.use("Agg")
 
 import pandas as pd
-from pathlib import Path
 
 from scripts.generate_final_figures import generate_figures
 
 
-def test_generate_all_figures(tmp_path, request):
+def test_generate_all_figures(tmp_path):
     """
     Generate every figure and table using synthetic inputs.
     """
@@ -39,12 +38,10 @@ def test_generate_all_figures(tmp_path, request):
                                "full_model_error_bps": [5.0, -5.0, 2.0, -2.0],
                                "simple_curve_error_bps": [20.0, -20.0, 4.0, -4.0]})
 
-    #use a persistent folder when manually inspecting figures.
-    #otherwise, use pytest's temporary directory.
-    if request.config.getoption("-s", default = False):
-        output_dir = Path("figures/synthetic")
-    else:
-        output_dir = tmp_path
+    # Always write under pytest's temporary directory. getoption("-s") is the
+    # capture mode under current pytest, which is truthy even when -s was not
+    # passed, so it cannot be used to choose a repo path.
+    output_dir = tmp_path
 
     generate_figures(errors, decisions, comparison, "2025-02-03", output_dir)
 

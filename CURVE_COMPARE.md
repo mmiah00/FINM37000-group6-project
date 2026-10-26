@@ -19,6 +19,17 @@ target-rate decisions when those files are already on disk. It does not fetch
 them. See "Real data" below. SR3, horizons 2-6, and replacing this bootstrap
 with `sofr_pricing.fit_meeting_moves` are still open.
 
+## Which result this is
+
+`final_visualizations/VISUALIZATIONS.md` (Issue #7) also compares a full model
+with this simplified curve, and it answers a different question. That page fits
+`sofr_pricing.fit_many` on the SR1 and SR3 strip once a month, scores cumulative
+errors out to six meetings, and at the next meeting compares that path with the
+simplified SR1 curve. This document compares a daily SR1 bootstrap with the
+simplified curve at the next meeting only. Quote this document for the
+bootstrap. Quote the Issue #7 page for the monthly full-strip path. The two
+tables are not the same test.
+
 ## Scope
 
 Issue #6 covers a large space (SR1 vs. SR3, several forecast horizons, real vs. synthetic
@@ -226,8 +237,9 @@ announcement date. Switching it is listed under "Pending".
   `build_forecast_errors` would score the later meetings if both methods wrote
   a cumulative change for each of them.
 - **`fit_meeting_moves`.** This bootstrap is still a separate SR1 inversion.
-  Scoring `sofr_pricing.fit_meeting_moves` against the simplified curve would
-  test the project's own estimator.
+  Issue #7 scores `sofr_pricing.fit_many` (SR1 and SR3, once a month) against
+  the simplified curve. Scoring this package's daily SR1 bootstrap against
+  `fit_meeting_moves` on the same dates is still open.
 - **Effective date.** The step is the announcement date, not
   `sofr_pricing.effective_date`.
 - **SR3** is out of scope.
