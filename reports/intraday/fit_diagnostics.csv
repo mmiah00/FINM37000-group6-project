@@ -1,0 +1,13 @@
+announcement_date,label,snapshot,n_contracts,n_meetings,rmse_bps,max_abs_residual_bps,jacobian_rank,fully_identified,condition_number,iterations,converged,used_realized_fixings
+2024-09-18,"Synthetic two-step cut (summer, EDT)",pre_1355,11,6,4.8492993102477086e-06,1.0190964871981123e-05,6,True,16.100960411033398,4,True,False
+2024-09-18,"Synthetic two-step cut (summer, EDT)",post_1415,11,6,5.5705041346183334e-06,1.090235599576772e-05,6,True,16.100960411033398,4,True,False
+2024-09-18,"Synthetic two-step cut (summer, EDT)",post_1445,11,6,7.342344933614925e-06,1.5198551750472689e-05,6,True,16.100960411033398,5,True,False
+2024-09-18,"Synthetic two-step cut (summer, EDT)",post_1600,11,6,7.342344933614925e-06,1.5198551750472689e-05,6,True,16.100960411033398,5,True,False
+2024-12-18,"Synthetic path markdown (winter, EST)",pre_1355,11,6,4.967571814327058e-06,1.163746503607399e-05,6,True,15.163295948780636,4,True,False
+2024-12-18,"Synthetic path markdown (winter, EST)",post_1415,11,6,5.22687818971179e-06,1.480438527323713e-05,6,True,15.163295948780636,4,True,False
+2024-12-18,"Synthetic path markdown (winter, EST)",post_1445,11,6,5.22687818971179e-06,1.480438527323713e-05,6,True,15.163295948780636,4,True,False
+2024-12-18,"Synthetic path markdown (winter, EST)",post_1600,11,6,5.22687818971179e-06,1.480438527323713e-05,6,True,15.163295948780636,4,True,False
+2023-06-14,"Synthetic hike priced out (summer, EDT)",pre_1355,11,5,6.733213052288297e-06,1.9943600193528255e-05,5,True,9.272749743455242,4,True,False
+2023-06-14,"Synthetic hike priced out (summer, EDT)",post_1415,11,5,0.0,0.0,5,True,9.272749743455242,1,True,False
+2023-06-14,"Synthetic hike priced out (summer, EDT)",post_1445,11,5,0.0,0.0,5,True,9.272749743455242,1,True,False
+2023-06-14,"Synthetic hike priced out (summer, EDT)",post_1600,11,5,0.0,0.0,5,True,9.272749743455242,1,True,False

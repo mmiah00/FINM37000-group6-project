@@ -1,0 +1,28 @@
+announcement_date,label,regime,meeting_date,move_bps,anchor_percent
+2024-09-18,"Synthetic two-step cut (summer, EDT)",pre_1355,2024-09-18,-25.0,5.375
+2024-09-18,"Synthetic two-step cut (summer, EDT)",pre_1355,2024-11-07,-25.0,5.375
+2024-09-18,"Synthetic two-step cut (summer, EDT)",pre_1355,2024-12-18,-10.0,5.375
+2024-09-18,"Synthetic two-step cut (summer, EDT)",statement,2024-09-18,-40.0,5.375
+2024-09-18,"Synthetic two-step cut (summer, EDT)",statement,2024-11-07,-25.0,5.375
+2024-09-18,"Synthetic two-step cut (summer, EDT)",statement,2024-12-18,-15.0,5.375
+2024-09-18,"Synthetic two-step cut (summer, EDT)",press,2024-09-18,-50.0,5.375
+2024-09-18,"Synthetic two-step cut (summer, EDT)",press,2024-11-07,-30.0,5.375
+2024-09-18,"Synthetic two-step cut (summer, EDT)",press,2024-12-18,-20.0,5.375
+2024-12-18,"Synthetic path markdown (winter, EST)",pre_1355,2024-12-18,-25.0,4.625
+2024-12-18,"Synthetic path markdown (winter, EST)",pre_1355,2025-01-29,-10.0,4.625
+2024-12-18,"Synthetic path markdown (winter, EST)",pre_1355,2025-03-19,-10.0,4.625
+2024-12-18,"Synthetic path markdown (winter, EST)",statement,2024-12-18,-25.0,4.625
+2024-12-18,"Synthetic path markdown (winter, EST)",statement,2025-01-29,-25.0,4.625
+2024-12-18,"Synthetic path markdown (winter, EST)",statement,2025-03-19,-20.0,4.625
+2024-12-18,"Synthetic path markdown (winter, EST)",press,2024-12-18,-25.0,4.625
+2024-12-18,"Synthetic path markdown (winter, EST)",press,2025-01-29,-25.0,4.625
+2024-12-18,"Synthetic path markdown (winter, EST)",press,2025-03-19,-20.0,4.625
+2023-06-14,"Synthetic hike priced out (summer, EDT)",pre_1355,2023-06-14,25.0,5.125
+2023-06-14,"Synthetic hike priced out (summer, EDT)",pre_1355,2023-07-26,25.0,5.125
+2023-06-14,"Synthetic hike priced out (summer, EDT)",pre_1355,2023-09-20,25.0,5.125
+2023-06-14,"Synthetic hike priced out (summer, EDT)",statement,2023-06-14,0.0,5.125
+2023-06-14,"Synthetic hike priced out (summer, EDT)",statement,2023-07-26,0.0,5.125
+2023-06-14,"Synthetic hike priced out (summer, EDT)",statement,2023-09-20,0.0,5.125
+2023-06-14,"Synthetic hike priced out (summer, EDT)",press,2023-06-14,0.0,5.125
+2023-06-14,"Synthetic hike priced out (summer, EDT)",press,2023-07-26,0.0,5.125
+2023-06-14,"Synthetic hike priced out (summer, EDT)",press,2023-09-20,0.0,5.125
