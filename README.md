@@ -106,17 +106,15 @@ In particular, we will examine whether a simplified smooth curve fails to captur
 
 ## Potential Extension: FOMC Announcement Reactions
 
-If time permits, we will extend the analysis using intraday SOFR futures data around FOMC announcements.
+The intraday extension fits the market-implied Fed path before and after FOMC announcements and shows its minute-by-minute change. See [INTRADAY.md](INTRADAY.md) for the data requirements, commands, and limitations.
 
-This extension would examine how the market-implied Fed path changes minute-by-minute immediately before and after an FOMC decision.
-
-The analysis could measure:
+With real minute bars, the analysis can measure:
 
 - The size of the market reaction to an announcement
 - Which future FOMC meetings experience the largest repricing
 - How quickly SOFR futures incorporate new monetary policy information
 
-This extension will be treated as optional so that the core historical analysis can be completed independently.
+The core historical analysis can be completed independently of this extension.
 
 ## Expected Output
 
@@ -150,7 +148,7 @@ The project will be developed in the following stages, with detailed tasks and p
 5. Evaluate Fed-path forecast accuracy. ([#5](https://github.com/mmiah00/FINM37000-group6-project/issues/5)) See [FORECAST_EVAL.md](FORECAST_EVAL.md).
 6. Compare the full model with a simplified curve methodology. ([#6](https://github.com/mmiah00/FINM37000-group6-project/issues/6)) See [CURVE_COMPARE.md](CURVE_COMPARE.md).
 7. Create final visualizations and analysis. ([#7](https://github.com/mmiah00/FINM37000-group6-project/issues/7))
-8. If time permits, analyze intraday FOMC announcement reactions. ([#8](https://github.com/mmiah00/FINM37000-group6-project/issues/8))
+8. Analyze intraday FOMC announcement reactions. ([#8](https://github.com/mmiah00/FINM37000-group6-project/issues/8)) See [INTRADAY.md](INTRADAY.md).
 
 ## Team and Issue Ownership
 
@@ -161,11 +159,9 @@ The project will be developed in the following stages, with detailed tasks and p
 | Theo Li | Design Leader | [#3](https://github.com/mmiah00/FINM37000-group6-project/issues/3), [#4](https://github.com/mmiah00/FINM37000-group6-project/issues/4) |
 | Sankalp Yadav | Design Leader | [#5](https://github.com/mmiah00/FINM37000-group6-project/issues/5), [#6](https://github.com/mmiah00/FINM37000-group6-project/issues/6) |
 
-[#8](https://github.com/mmiah00/FINM37000-group6-project/issues/8) is optional and unassigned; whoever is ahead after October 20 can pick it up.
-
 ## How to Run
 
-*Status: SOFR futures data collection (see [Getting the SOFR futures data](#getting-the-sofr-futures-data) and [DATA.md](DATA.md)), FOMC meeting data, SR1/SR3 pricing, and the issue #5 forecast evaluation (see [FORECAST_EVAL.md](FORECAST_EVAL.md)) are implemented. The issue #6 comparison against a simplified SOFR curve (see [CURVE_COMPARE.md](CURVE_COMPARE.md)) also runs, on synthetic data, without the course package or a Databento key. Path estimation and final visualizations are still planned. These steps describe how the full project is intended to run once every stage is implemented.*
+*Status: Data collection, FOMC meeting data, SR1/SR3 pricing, and path estimation are implemented. The forecast evaluation ([FORECAST_EVAL.md](FORECAST_EVAL.md)), curve comparison ([CURVE_COMPARE.md](CURVE_COMPARE.md)), and intraday study ([INTRADAY.md](INTRADAY.md)) have runnable synthetic demonstrations. The intraday figures are not historical market results; see their documentation before presenting them as evidence. Final visualizations remain planned.*
 
 1. Use Python 3.12 or newer.
 2. Install the project dependencies, including the course package [`finm37000`](https://github.com/pattersonem/finm37000-autumn-2026).
