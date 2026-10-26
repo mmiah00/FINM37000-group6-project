@@ -16,7 +16,7 @@ The object is the change in the implied cumulative policy rate, in basis points,
 
 **Clock.** The statement is treated as 14:00 US Eastern and the press conference as 14:30 US Eastern. `zoneinfo` (`America/New_York`) applies the daylight-saving offset for that calendar date. 14:00 on 2024-06-12 is 18:00 UTC (EDT, UTC−4). 14:00 on 2024-12-18 is 19:00 UTC (EST, UTC−5). The window is not a fixed UTC offset.
 
-**Window.** Default is 60 minutes before the statement through 120 minutes after: 13:00 to 16:00 Eastern. The Databento request starts one minute earlier, because a bar is stamped at its start and the close is known at the end of the minute. The request end is exclusive and equals the window end, so the last included bar is the one that closes at 16:00.
+**Window.** The window is 60 minutes before the statement through 120 minutes after: 13:00 to 16:00 Eastern. The Databento request starts one minute earlier, because a bar is stamped at its start and the close is known at the end of the minute. The request end is exclusive and equals the window end, so the last included bar is the one that closes at 16:00.
 
 **Snapshots.**
 
@@ -25,7 +25,7 @@ The object is the change in the implied cumulative policy rate, in basis points,
 | `pre_1355` | 13:55 | last trade at or before 13:55, the pre-statement book |
 | `post_1415` | 14:15 | fifteen minutes after the statement |
 | `post_1445` | 14:45 | fifteen minutes after the 14:30 press conference |
-| `post_1600` | 16:00 | end of the default window |
+| `post_1600` | 16:00 | end of the window |
 
 Databento `ohlcv-1m` `ts_event` is the bar start, in UTC. The close is the last trade of that minute, so a snapshot "at or before 13:55" uses bars whose end is at or before 13:55 (the bar that started at 13:54). The bar that starts at 13:55 is not in yet. On the minute path, minute 0 (exactly 14:00) is still the pre-statement book. Minute 1 is the first close from the statement minute. Minute 30 (exactly 14:30) is still the statement book. Minute 31 is the first close from the press-conference minute.
 
@@ -33,9 +33,9 @@ A volume of zero is not a trade. A missing volume with a close is treated as a t
 
 **Contract universe.** Every fit on that afternoon uses only the contracts that had already traded by 13:55. A contract that prints for the first time after the statement is left out of every fit, so a new symbol cannot look like a repricing. Minutes before that whole set has printed are skipped on the path. A required snapshot with an incomplete set raises, rather than fitting a shorter strip.
 
-**Which contracts.** The default strip is 8 SR1 months and 3 quarterly SR3 contracts (11 outrights). Raw CME symbols (`SR3U4`) come from `sofr_data.contracts.Contract`. The daily estimator uses 13 SR1 and 6 SR3. That longer strip reaches meetings a three-hour window barely trades, and on the dates checked here the Jacobian is one rank short (12 meetings, rank 11, condition number around 1e17 on 2024-09-18 and 2024-12-18). Eight and three stay full rank on those dates (condition numbers about 16, 15, and 9). Pass `--n-sr1 13 --n-sr3 6` to request the daily strip. Serial SR3 months are not used: `contract_strip` builds quarterly SR3 only.
+**Which contracts.** The strip is 8 SR1 months and 3 quarterly SR3 contracts (11 outrights). Raw CME symbols (`SR3U4`) come from `sofr_data.contracts.Contract`. The daily estimator uses 13 SR1 and 6 SR3. That longer strip reaches meetings a three-hour window barely trades, and on the dates checked here the Jacobian is one rank short (12 meetings, rank 11, condition number around 1e17 on 2024-09-18 and 2024-12-18). Eight and three stay full rank on those dates (condition numbers about 16, 15, and 9). Serial SR3 months are not used: `contract_strip` builds quarterly SR3 only.
 
-**Which announcements.** Dates come from the team's FOMC calendar inside the futures sample (2022-01-01 through 2026-09-30). The estimator refuses a strip whose last reference day sits more than about nine weeks past the last scheduled meeting. The published calendar ends on 2026-09-16, so the latest dates drop out. With the default strip, 33 of 38 calendar dates are covered: 2022-01-26 through 2026-01-28. The five dropped dates are 2026-03-18, 2026-04-29, 2026-06-17, 2026-07-29, and 2026-09-16. The fetch script refuses those dates instead of paying for bars the fit cannot use.
+**Which announcements.** Dates come from the team's FOMC calendar inside the futures sample (2022-01-01 through 2026-09-30). The estimator refuses a strip whose last reference day sits more than about nine weeks past the last scheduled meeting. The published calendar ends on 2026-09-16, so the latest dates drop out. With the fixed strip, 33 of 38 calendar dates are covered: 2022-01-26 through 2026-01-28. The five dropped dates are 2026-03-18, 2026-04-29, 2026-06-17, 2026-07-29, and 2026-09-16. The fetch script refuses those dates instead of paying for bars the fit cannot use.
 
 **Anchor.** The policy rate is the target-range midpoint in force that morning, `policy_level_on(..., after_announcement=False)`, the same anchor `fit_many` uses. When `data/processed/sofr_daily.csv` is present, the SOFR-minus-policy basis is `estimate_basis` through `last_known_fixing_date`. SOFR for the announcement day is published the next morning, so it is not in the anchor or the basis. The synthetic check passes no SOFR series, so the basis is zero and the scenario supplies the anchor.
 

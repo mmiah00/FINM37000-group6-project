@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from fomc_intraday.events import DEFAULT_N_SR1, DEFAULT_N_SR3, contracts_for
+from fomc_intraday.events import contracts_for
 from fomc_intraday.windows import announcement_window, to_utc
 from sofr_data import config
 
@@ -49,13 +49,7 @@ def raw_cache_path(announcement_date, raw_dir=None):
     return directory / f"{day}.parquet"
 
 
-def build_requests(
-    announcement_dates,
-    n_sr1=DEFAULT_N_SR1,
-    n_sr3=DEFAULT_N_SR3,
-    minutes_before=60,
-    minutes_after=120,
-):
+def build_requests(announcement_dates):
     """One Databento request per announcement. No network.
 
     `start` is one minute before the window so the snapshot at the open
@@ -66,8 +60,8 @@ def build_requests(
     requests = []
     for announcement_date in announcement_dates:
         day = pd.Timestamp(announcement_date).normalize()
-        contracts = contracts_for(day, n_sr1=n_sr1, n_sr3=n_sr3)
-        window = announcement_window(day, minutes_before=minutes_before, minutes_after=minutes_after)
+        contracts = contracts_for(day)
+        window = announcement_window(day)
         start = (to_utc(window["window_start"]) - pd.Timedelta(minutes=1)).to_pydatetime()
         end = to_utc(window["window_end"]).to_pydatetime()
         requests.append({

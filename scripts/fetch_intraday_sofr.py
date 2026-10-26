@@ -3,8 +3,8 @@
 
 The bars are Databento `GLBX.MDP3` `ohlcv-1m` for the SR1 and SR3 outright
 contracts the meeting-path estimator uses. The window is 60 minutes before
-the 14:00 US Eastern statement through 120 minutes after, unless flags
-say otherwise. The key is read the same way as the daily settlement pull
+the 14:00 US Eastern statement through 120 minutes after. The key is read
+the same way as the daily settlement pull
 (`~/.databento_api_key`, then `DATABENTO_API_KEY`).
 
 The script asks Databento what the request would cost and does not
@@ -26,8 +26,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fomc_intraday.events import (  # noqa: E402
-    DEFAULT_N_SR3,
-    DEFAULT_N_SR1,
     calendar_meeting_dates,
     covered_announcements,
 )
@@ -37,7 +35,6 @@ from fomc_intraday.fetch import (  # noqa: E402
     build_requests,
     pull,
 )
-from fomc_intraday.windows import DEFAULT_MINUTES_AFTER, DEFAULT_MINUTES_BEFORE  # noqa: E402
 
 
 def parse_args(argv=None):
@@ -49,10 +46,6 @@ def parse_args(argv=None):
         default=None,
         help="Announcement dates (YYYY-MM-DD). Default: every covered date in the team calendar.",
     )
-    parser.add_argument("--n-sr1", type=int, default=DEFAULT_N_SR1)
-    parser.add_argument("--n-sr3", type=int, default=DEFAULT_N_SR3)
-    parser.add_argument("--minutes-before", type=int, default=DEFAULT_MINUTES_BEFORE)
-    parser.add_argument("--minutes-after", type=int, default=DEFAULT_MINUTES_AFTER)
     parser.add_argument(
         "--max-cost",
         type=float,
@@ -80,7 +73,7 @@ def parse_args(argv=None):
 def choose_dates(args):
     """Dates to request, and any the user named that the schedule cannot cover."""
     schedule = calendar_meeting_dates()
-    covered = covered_announcements(schedule, n_sr1=args.n_sr1, n_sr3=args.n_sr3)
+    covered = covered_announcements(schedule)
     covered_set = {day.date().isoformat() for day in covered}
     if args.dates is None:
         return [day.date().isoformat() for day in covered], []
@@ -140,13 +133,7 @@ def main(argv=None):
         print("No announcements to request.", file=sys.stderr)
         return 2
 
-    requests = build_requests(
-        dates,
-        n_sr1=args.n_sr1,
-        n_sr3=args.n_sr3,
-        minutes_before=args.minutes_before,
-        minutes_after=args.minutes_after,
-    )
+    requests = build_requests(dates)
     cached_count = sum(1 for request in requests if _cached(request))
 
     if args.offline:

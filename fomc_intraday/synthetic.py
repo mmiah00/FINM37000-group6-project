@@ -22,7 +22,7 @@ post-statement bar starts at 14:00.
 
 import pandas as pd
 
-from fomc_intraday.events import DEFAULT_N_SR1, DEFAULT_N_SR3, contracts_for
+from fomc_intraday.events import contracts_for
 from fomc_intraday.windows import (
     PRESS_CONFERENCE_TIME,
     STATEMENT_TIME,
@@ -99,11 +99,7 @@ def make_synthetic_minutes(
     press_moves_bps=None,
     anchor=5.375,
     basis=0.0,
-    n_sr1=DEFAULT_N_SR1,
-    n_sr3=DEFAULT_N_SR3,
     holidays=(),
-    minutes_before=60,
-    minutes_after=120,
     label=None,
 ):
     """Minute bars and the moves that generated them.
@@ -122,12 +118,12 @@ def make_synthetic_minutes(
     if press_moves is None:
         press_moves = dict(statement_moves)
 
-    contracts = contracts_for(day, n_sr1=n_sr1, n_sr3=n_sr3)
+    contracts = contracts_for(day)
     pre_px = _regime_prices(day, contracts, pre_moves, anchor, basis, holidays)
     statement_px = _regime_prices(day, contracts, statement_moves, anchor, basis, holidays)
     press_px = _regime_prices(day, contracts, press_moves, anchor, basis, holidays)
 
-    window = announcement_window(day, minutes_before=minutes_before, minutes_after=minutes_after)
+    window = announcement_window(day)
     statement_utc = to_utc(eastern_on(day, STATEMENT_TIME))
     press_utc = to_utc(eastern_on(day, PRESS_CONFERENCE_TIME))
 

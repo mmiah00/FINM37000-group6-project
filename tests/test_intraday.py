@@ -37,6 +37,7 @@ from fomc_intraday.study import market_anchor, run_event_study
 from sofr_pricing import FitResult
 from fomc_intraday.synthetic import DEMO_SCENARIOS, make_synthetic_minutes
 from fomc_intraday.windows import announcement_window, to_utc
+from scripts.fetch_intraday_sofr import parse_args as parse_fetch_args
 from sofr_pricing.synthetic import make_synthetic_decisions, make_synthetic_realized_sofr
 
 # Far enough from a 1 bp move that a wrong regime fails, and wide enough
@@ -107,6 +108,15 @@ def test_request_bounds_follow_the_window_across_dst():
     assert "SR1Z4" in december["symbols"]  # December 2024
     assert "SR3Z4" in december["symbols"]
     assert request_kwargs(june)["symbols"] == june["symbols"]
+    assert len(june["symbols"]) == 11
+    assert len(december["symbols"]) == 11
+
+
+@pytest.mark.parametrize("option", ["--minutes-before", "--minutes-after", "--n-sr1", "--n-sr3"])
+def test_fetch_cli_rejects_alternate_window_and_strip(option):
+    with pytest.raises(SystemExit) as error:
+        parse_fetch_args([option, "1"])
+    assert error.value.code == 2
 
 
 def test_today_stays_in_the_unknown_list():

@@ -29,7 +29,7 @@ from sofr_pricing import contract_strip, fixing_dates, upcoming_meetings
 # one rank short and the condition number blows up). Eight and three
 # cover the next several meetings, stay full rank on the dates checked
 # in the tests, and are the outright contracts a minute-bar pull can
-# actually price. Pass n_sr1=13, n_sr3=6 to match the daily strip.
+# actually price.
 DEFAULT_N_SR1 = 8
 DEFAULT_N_SR3 = 3
 
@@ -79,14 +79,14 @@ def estimator_meeting_dates(announcement_date, meeting_dates):
     return stamped
 
 
-def contracts_for(announcement_date, n_sr1=DEFAULT_N_SR1, n_sr3=DEFAULT_N_SR3):
+def contracts_for(announcement_date):
     """SR1/SR3 strip the estimator needs that day, plus the CME raw symbol.
 
     `contract_id` matches `sofr_pricing.contract_strip` (`SR3-2024-09`).
     `raw_symbol` matches the settlement pipeline (`SR3U4`).
     """
     day = pd.Timestamp(announcement_date).normalize()
-    table = contract_strip(day, n_sr1=n_sr1, n_sr3=n_sr3).copy()
+    table = contract_strip(day, n_sr1=DEFAULT_N_SR1, n_sr3=DEFAULT_N_SR3).copy()
 
     def raw_symbol(contract_id):
         root, year, month = contract_id.split("-")
@@ -96,13 +96,13 @@ def contracts_for(announcement_date, n_sr1=DEFAULT_N_SR1, n_sr3=DEFAULT_N_SR3):
     return table
 
 
-def strip_is_covered(announcement_date, meeting_dates, n_sr1=DEFAULT_N_SR1, n_sr3=DEFAULT_N_SR3):
+def strip_is_covered(announcement_date, meeting_dates):
     """True when the estimator can see every meeting this strip can reach.
 
     Uses `upcoming_meetings`, so the rule cannot drift from the fit.
     """
     day = pd.Timestamp(announcement_date).normalize()
-    contracts = contracts_for(day, n_sr1=n_sr1, n_sr3=n_sr3)
+    contracts = contracts_for(day)
     last_day = pd.Timestamp(contracts["reference_end"].max())
     first_day = pd.Timestamp(contracts["reference_start"].min()) - pd.Timedelta(days=10)
     dates = fixing_dates(first_day, last_day + pd.Timedelta(days=10))
@@ -118,11 +118,7 @@ def strip_is_covered(announcement_date, meeting_dates, n_sr1=DEFAULT_N_SR1, n_sr
     return True
 
 
-def covered_announcements(
-    meeting_dates=None,
-    n_sr1=DEFAULT_N_SR1,
-    n_sr3=DEFAULT_N_SR3,
-):
+def covered_announcements(meeting_dates=None):
     """Announcements inside the calendar whose strip the schedule can support.
 
     `meeting_dates` defaults to the full team calendar. Passing a shorter
@@ -132,6 +128,6 @@ def covered_announcements(
         meeting_dates = calendar_meeting_dates()
     covered = []
     for day in meeting_dates:
-        if strip_is_covered(day, meeting_dates, n_sr1=n_sr1, n_sr3=n_sr3):
+        if strip_is_covered(day, meeting_dates):
             covered.append(pd.Timestamp(day).normalize())
     return covered

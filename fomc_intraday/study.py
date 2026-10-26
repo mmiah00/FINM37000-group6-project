@@ -125,8 +125,6 @@ def run_event_study(
     basis=0.0,
     realized_fixings=None,
     holidays=(),
-    minutes_before=60,
-    minutes_after=120,
     minute_horizons=MINUTE_HORIZONS,
     label=None,
 ):
@@ -141,7 +139,7 @@ def run_event_study(
     if day not in {pd.Timestamp(meeting).normalize() for meeting in meeting_dates}:
         raise ValueError(f"{day.date()} is not in meeting_dates; today's move would be missed")
 
-    window = announcement_window(day, minutes_before=minutes_before, minutes_after=minutes_after)
+    window = announcement_window(day)
     day_bars = bars
     if "announcement_date" in bars.columns:
         dates = pd.to_datetime(bars["announcement_date"]).dt.tz_localize(None).dt.normalize()

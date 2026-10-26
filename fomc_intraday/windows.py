@@ -59,40 +59,24 @@ def to_utc(timestamp):
     return stamp.tz_convert("UTC")
 
 
-def announcement_window(
-    announcement_date,
-    minutes_before=DEFAULT_MINUTES_BEFORE,
-    minutes_after=DEFAULT_MINUTES_AFTER,
-):
+def announcement_window(announcement_date):
     """Window and snapshot times around the 14:00 Eastern statement.
 
-    Defaults are 60 minutes before the statement through 120 minutes after
+    The window runs 60 minutes before the statement through 120 minutes after
     (13:00 to 16:00 Eastern). The pre snapshot is the last trade at or
     before 13:55. Post snapshots are 14:15, 14:45, and the window end
-    (16:00 with the defaults), so one of them sits after the 14:30 press
+    (16:00), so one of them sits after the 14:30 press
     conference.
 
     Every returned timestamp is timezone-aware US Eastern.
     """
-    if minutes_before < 5:
-        raise ValueError("minutes_before must be at least 5 so 13:55 Eastern is inside the window")
-    if minutes_after < 1:
-        raise ValueError("minutes_after must be positive")
-
     statement = eastern_on(announcement_date, STATEMENT_TIME)
-    window_start = statement - pd.Timedelta(minutes=int(minutes_before))
-    window_end = statement + pd.Timedelta(minutes=int(minutes_after))
+    window_start = statement - pd.Timedelta(minutes=DEFAULT_MINUTES_BEFORE)
+    window_end = statement + pd.Timedelta(minutes=DEFAULT_MINUTES_AFTER)
     pre_snapshot = eastern_on(announcement_date, PRE_SNAPSHOT_TIME)
-    if not (window_start <= pre_snapshot < statement):
-        raise ValueError("pre snapshot 13:55 Eastern fell outside the window")
 
-    post_snapshots = []
-    for clock in POST_SNAPSHOT_TIMES:
-        stamp = eastern_on(announcement_date, clock)
-        if statement < stamp <= window_end:
-            post_snapshots.append(stamp)
-    if window_end > statement and (not post_snapshots or post_snapshots[-1] != window_end):
-        post_snapshots.append(window_end)
+    post_snapshots = [eastern_on(announcement_date, clock) for clock in POST_SNAPSHOT_TIMES]
+    post_snapshots.append(window_end)
 
     return {
         "announcement_date": as_naive_date(announcement_date),
