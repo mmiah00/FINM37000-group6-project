@@ -38,6 +38,7 @@ from sofr_pricing import FitResult
 from fomc_intraday.synthetic import DEMO_SCENARIOS, make_synthetic_minutes
 from fomc_intraday.windows import announcement_window, to_utc
 from scripts.fetch_intraday_sofr import parse_args as parse_fetch_args
+from scripts.run_intraday_demo import write_outputs
 from sofr_pricing.synthetic import make_synthetic_decisions, make_synthetic_realized_sofr
 
 # Far enough from a 1 bp move that a wrong regime fails, and wide enough
@@ -476,6 +477,53 @@ def test_plots_return_one_panel_per_announcement_and_a_horizon_chart():
     assert len(changes.axes) == 1
     plt.close(paths)
     plt.close(changes)
+
+
+def test_real_outputs_skip_unidentified_path_chart(tmp_path, capsys, monkeypatch):
+    snapshots = pd.DataFrame({
+        "announcement_date": pd.to_datetime(["2024-06-12", "2024-12-18"]),
+        "label": ["identified", "unidentified"],
+        "snapshot": ["post_1600", "post_1600"],
+        "horizon": [1, 1],
+        "delta_cum_bps": [-5.0, -10.0],
+    })
+    minutes = pd.DataFrame({
+        "label": ["identified", "identified", "unidentified", "unidentified"],
+        "horizon": [1, 1, 1, 1],
+        "minutes_from_statement": [-10, 10, -10, 10],
+        "implied_cum_change_bps": [0.0, -5.0, 0.0, -10.0],
+    })
+    diagnostics = pd.DataFrame({
+        "label": ["identified", "unidentified"],
+        "snapshot": ["post_1600", "post_1600"],
+        "fully_identified": [True, False],
+    })
+    import scripts.run_intraday_demo as runner
+
+    plotted = []
+    original_plot = runner.plot_repricing_paths
+
+    def record_plot(rows, **kwargs):
+        plotted.append(set(rows["label"].astype(str)))
+        return original_plot(rows, **kwargs)
+
+    monkeypatch.setattr(runner, "plot_repricing_paths", record_plot)
+    write_outputs(tmp_path, snapshots, minutes, diagnostics, synthetic=False)
+    assert plotted == [{"identified"}]
+    assert (tmp_path / "repricing_paths.png").exists()
+
+    write_outputs(
+        tmp_path,
+        snapshots.loc[snapshots["label"] == "unidentified"],
+        minutes.loc[minutes["label"] == "unidentified"],
+        diagnostics.loc[diagnostics["label"] == "unidentified"],
+        synthetic=False,
+    )
+    assert plotted == [{"identified"}]
+    assert not (tmp_path / "repricing_paths.png").exists()
+    assert (tmp_path / "change_by_horizon.png").exists()
+    assert set(pd.read_csv(tmp_path / "minute_paths.csv")["label"]) == {"unidentified"}
+    assert "Skipped repricing_paths.png: no fully identified afternoon at 16:00." in capsys.readouterr().out
 
 
 def test_published_sofr_that_starts_inside_the_front_month_is_left_unspliced():

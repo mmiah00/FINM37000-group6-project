@@ -201,14 +201,12 @@ def _path_labels(snapshots, diagnostics, limit=3):
         (diagnostics["snapshot"] == "post_1600") & (diagnostics["fully_identified"].astype(bool))
     ]
     ranked = post.loc[post["label"].isin(set(identified["label"]))]
-    if ranked.empty:
-        ranked = post
     ranked = ranked.assign(abs_move=ranked["delta_cum_bps"].abs())
     return list(ranked.sort_values("abs_move", ascending=False)["label"].head(limit))
 
 
 def write_outputs(out, snapshots, minutes, diagnostics, synthetic, truths=None):
-    """Write the two figures and the tables. Returns the max synthetic error, or None."""
+    """Write available figures and the tables. Returns the max synthetic error, or None."""
     directory = Path(out)
     directory.mkdir(parents=True, exist_ok=True)
 
@@ -219,9 +217,14 @@ def write_outputs(out, snapshots, minutes, diagnostics, synthetic, truths=None):
         # Keep the chart in the same order as the ranking, not file order.
         path_minutes = path_minutes.copy()
         path_minutes["label"] = pd.Categorical(path_minutes["label"], categories=labels, ordered=True)
-    paths = plot_repricing_paths(path_minutes, synthetic=synthetic)
+    path_file = directory / "repricing_paths.png"
+    if not path_minutes.empty:
+        paths = plot_repricing_paths(path_minutes, synthetic=synthetic)
+        paths.savefig(path_file, dpi=150)
+    else:
+        path_file.unlink(missing_ok=True)
+        print("Skipped repricing_paths.png: no fully identified afternoon at 16:00.")
     changes = plot_change_by_horizon(snapshots, synthetic=synthetic)
-    paths.savefig(directory / "repricing_paths.png", dpi=150)
     changes.savefig(directory / "change_by_horizon.png", dpi=150)
 
     snapshots.to_csv(directory / "snapshot_changes.csv", index=False)
