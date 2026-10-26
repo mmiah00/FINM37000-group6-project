@@ -45,7 +45,7 @@ def generate_figures(errors, decisions, comparison, obs_date, output_dir):
     Generate the available final figures and summary tables.
     """
     apply_style()
-    
+
     output_dir = Path(output_dir)
     output_dir.mkdir(parents = True, exist_ok = True)
 

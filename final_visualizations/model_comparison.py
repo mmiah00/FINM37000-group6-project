@@ -109,4 +109,3 @@ def plot_model_comparison(results):
     fig.tight_layout()
 
     return fig
-
