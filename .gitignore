@@ -9,6 +9,11 @@ data/raw/
 data/processed/
 .cache/
 
+# Fitted minute path from the real intraday run. The script regenerates it
+# locally. The full-resolution series is not committed; Databento's licence
+# restricts redistribution. Figures and the snapshot summary tables stay.
+reports/intraday/real/minute_paths.csv
+
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
