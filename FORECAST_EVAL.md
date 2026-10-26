@@ -5,9 +5,10 @@ FOMC decisions that followed: forecast errors in basis points, bias, MAE, RMSE a
 rate at horizons of 1 to 6 meetings ahead, how accuracy changes as a meeting approaches, and a
 split by policy regime.
 
-**Status:** the evaluation runs on **synthetic data**. It has no real results yet, because the real
-implied paths depend on #4 and the realized decisions on #2 (PR #13). Neither package is imported
-here; the two tables below are the only connection.
+**Status:** the synthetic evaluation runs here; historical real-data evaluation now runs through
+the Issue #7 workflow in [final_visualizations/VISUALIZATIONS.md](final_visualizations/VISUALIZATIONS.md).
+Its quoted full-versus-simplified comparison table is still from the earlier basis-0 run and was
+not regenerated after the basis change.
 
 ## Definitions
 
