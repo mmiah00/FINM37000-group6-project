@@ -190,7 +190,7 @@ def run_real():
 def _path_labels(snapshots, diagnostics, limit=3):
     """Up to `limit` fully identified announcements with the largest horizon-1 move.
 
-    The path chart is two or three afternoons. The horizon chart and the
+    The path chart has up to three afternoons. The horizon chart and the
     tables keep the whole sample. A day that is not full rank stays in
     the tables and off this chart, because that path is not unique.
     """
