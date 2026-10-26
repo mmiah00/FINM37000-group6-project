@@ -140,7 +140,7 @@ python scripts/run_intraday_demo.py --out reports/intraday
 Real book. The daily SOFR, EFFR, and FOMC files come from `scripts/fetch_rate_data.py` (no Databento key). The minute bars come from `scripts/fetch_intraday_sofr.py`, which quotes `metadata.get_cost` and stops if the quote is above 5 dollars. `--real` only reads the caches. Point it at `reports/intraday/real` so the drill stays put:
 
 ```bash
-python scripts/fetch_rate_data.py
+PYTHONPATH=. python scripts/fetch_rate_data.py
 python scripts/fetch_intraday_sofr.py --dry-run
 python scripts/fetch_intraday_sofr.py
 python scripts/run_intraday_demo.py --real --out reports/intraday/real

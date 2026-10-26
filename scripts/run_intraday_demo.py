@@ -11,7 +11,7 @@ recovers it. No Databento key and no network.
 With bars and daily rates already on disk, write the market study
 somewhere other than the synthetic directory:
 
-    python scripts/fetch_rate_data.py
+    PYTHONPATH=. python scripts/fetch_rate_data.py
     python scripts/fetch_intraday_sofr.py --dry-run
     python scripts/run_intraday_demo.py --real --out reports/intraday/real
 
