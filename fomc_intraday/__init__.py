@@ -13,7 +13,7 @@ from fomc_intraday.events import (
     covered_announcements,
 )
 from fomc_intraday.plots import plot_change_by_horizon, plot_repricing_paths
-from fomc_intraday.snapshots import carry_forward_prices, select_snapshot
+from fomc_intraday.snapshots import select_snapshot
 from fomc_intraday.study import market_anchor, run_event_study
 from fomc_intraday.synthetic import DEMO_SCENARIOS, make_synthetic_minutes
 from fomc_intraday.windows import announcement_window
@@ -24,7 +24,6 @@ __all__ = [
     "DEMO_SCENARIOS",
     "announcement_window",
     "calendar_meeting_dates",
-    "carry_forward_prices",
     "contracts_for",
     "covered_announcements",
     "make_synthetic_minutes",

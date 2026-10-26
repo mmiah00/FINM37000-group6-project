@@ -32,7 +32,7 @@ from fomc_intraday.fetch import (
     request_kwargs,
 )
 from fomc_intraday.plots import plot_change_by_horizon, plot_repricing_paths
-from fomc_intraday.snapshots import carry_forward_prices, select_snapshot
+from fomc_intraday.snapshots import select_snapshot
 from fomc_intraday.study import market_anchor, run_event_study
 from sofr_pricing import FitResult
 from fomc_intraday.synthetic import DEMO_SCENARIOS, make_synthetic_minutes
@@ -197,9 +197,6 @@ def test_carry_forward_and_zero_volume():
     prices = dict(zip(carried["contract_id"], carried["close"]))
     assert prices["SR1-2024-12"] == 94.0  # still the 13:40 trade
     assert prices["SR3-2024-12"] == 93.0  # first trade is before 14:15
-
-    grid = carry_forward_prices(bars, [pre, later])
-    assert set(grid.loc[grid["snapshot_time"] == pre, "contract_id"]) == {"SR1-2024-12"}
 
 
 def test_pre_snapshot_misses_a_trade_that_starts_after_the_statement():

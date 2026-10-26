@@ -78,28 +78,6 @@ def select_snapshot(bars, snapshot_time):
     return eligible.loc[chosen].reset_index(drop=True)
 
 
-def carry_forward_prices(bars, times):
-    """Last traded close at each timestamp, carried forward when a minute is quiet.
-
-    This is `select_snapshot` at every time in `times`. A contract that
-    has not traded yet does not appear at that time. Once it has traded,
-    later quiet minutes repeat that close.
-
-    Adds `snapshot_time` on each row.
-    """
-    frames = []
-    for stamp in times:
-        snapshot = select_snapshot(bars, stamp)
-        if snapshot.empty:
-            continue
-        snapshot = snapshot.copy()
-        snapshot["snapshot_time"] = pd.Timestamp(stamp)
-        frames.append(snapshot)
-    if not frames:
-        return pd.DataFrame()
-    return pd.concat(frames, ignore_index=True)
-
-
 def to_contract_table(snapshot):
     """Rename a snapshot into the columns `fit_meeting_moves` expects.
 
