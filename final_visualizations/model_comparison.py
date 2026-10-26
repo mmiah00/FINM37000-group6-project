@@ -14,11 +14,11 @@ from final_visualizations.style import COLORS
 
 
 def _distinct_meetings(frame):
-    """Distinct meeting dates behind ``frame``, or missing if no meeting column is present."""
+    """Distinct meeting dates behind ``frame``."""
     for column in ("meeting_date", "next_meeting"):
         if column in frame.columns:
             return int(pd.to_datetime(frame[column]).nunique())
-    return pd.NA
+    raise ValueError("model comparison needs meeting_date or next_meeting to report n_meetings")
 
 
 def summarize_model_comparison(results):

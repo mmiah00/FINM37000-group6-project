@@ -44,6 +44,11 @@ def test_model_comparison_summary(sample_comparison):
     assert summary.loc["Simplified curve", "mae_bps"] == 12.0
 
 
+def test_model_comparison_requires_meeting_dates(sample_comparison):
+    with pytest.raises(ValueError, match="meeting_date or next_meeting"):
+        summarize_model_comparison(sample_comparison.drop(columns="next_meeting"))
+
+
 def test_model_comparison_figure(sample_comparison):
     """
     Verify that the comparison chart is created.

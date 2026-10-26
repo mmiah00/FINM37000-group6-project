@@ -34,7 +34,8 @@ def test_generate_all_figures(tmp_path):
 
     errors = pd.DataFrame(rows)
 
-    comparison = pd.DataFrame({"rate_change_at_meeting": [True, True, False, False],
+    comparison = pd.DataFrame({"meeting_date": meeting_dates,
+                               "rate_change_at_meeting": [True, True, False, False],
                                "full_model_error_bps": [5.0, -5.0, 2.0, -2.0],
                                "simple_curve_error_bps": [20.0, -20.0, 4.0, -4.0]})
 
@@ -59,3 +60,6 @@ def test_generate_all_figures(tmp_path):
 
     for filename in expected:
         assert (output_dir / filename).exists()
+
+    summary = pd.read_csv(output_dir / "model_comparison_summary.csv")
+    assert summary["n_meetings"].tolist() == [4, 4]

@@ -108,7 +108,7 @@ def test_horizon_counts_stop_at_the_end_of_the_meeting_file():
         "change_bps": [-25.0, 0.0],
     })
 
-    errors, by_horizon = build_visualization_inputs(implied, decisions, max_horizon=6)
+    errors, by_horizon = build_visualization_inputs(implied, decisions)
 
     assert list(by_horizon.index) == [1, 2]
     assert by_horizon["n_obs"].tolist() == [1, 1]
