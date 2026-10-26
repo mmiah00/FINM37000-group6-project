@@ -165,7 +165,7 @@ The project will be developed in the following stages, with detailed tasks and p
 
 ## How to Run
 
-*Status: SOFR futures data collection (see [Getting the SOFR futures data](#getting-the-sofr-futures-data) and [DATA.md](DATA.md)), FOMC meeting data, SR1/SR3 pricing, and the issue #5 forecast evaluation (see [FORECAST_EVAL.md](FORECAST_EVAL.md)) are implemented. The issue #6 comparison against a simplified SOFR curve (see [CURVE_COMPARE.md](CURVE_COMPARE.md)) also runs, on synthetic data, without the course package or a Databento key. Path estimation and final visualizations are still planned. These steps describe how the full project is intended to run once every stage is implemented.*
+*Status: SOFR futures data collection (see [Getting the SOFR futures data](#getting-the-sofr-futures-data) and [DATA.md](DATA.md)), FOMC meeting data, SR1/SR3 pricing, path estimation, and the issue #5 forecast evaluation (see [FORECAST_EVAL.md](FORECAST_EVAL.md)) are implemented. The issue #6 comparison against a simplified SOFR curve (see [CURVE_COMPARE.md](CURVE_COMPARE.md)) runs on synthetic data without the course package or a Databento key. The issue #7 figures and historical workflow are described in [final_visualizations/VISUALIZATIONS.md](final_visualizations/VISUALIZATIONS.md); its published comparison metrics are from an earlier basis-0 run. Follow the linked guides to run each stage.*
 
 1. Use Python 3.12 or newer.
 2. Install the project dependencies, including the course package [`finm37000`](https://github.com/pattersonem/finm37000-autumn-2026).

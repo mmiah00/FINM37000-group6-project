@@ -66,7 +66,7 @@ The historical comparison evaluates the full FOMC-aware model against a simplifi
 
 The simplified methodology bootstraps a zero-rate curve from observed SR1 settlements without explicitly modeling FOMC meeting dates. Its implied forward SOFR rates are converted into estimated policy-rate changes using a historical SOFR baseline.
 
-The baseline follows the Issue #6 convention of averaging up to five recent available SOFR fixings following the previous FOMC meeting.
+The baseline follows the Issue #6 convention of averaging up to five published SOFR fixings after the previous FOMC meeting. If none are available yet, it averages up to five pre-meeting fixings and adds that meeting's realized policy change.
 
 This historical adaptation assumes that the SOFR–policy spread remains approximately constant over the forecast horizon. The simplified forward is read on the meeting's effective date, not on the announcement date. When a hold has no effective date, that date is the next business day after the announcement.
 

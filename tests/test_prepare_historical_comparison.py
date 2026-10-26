@@ -27,7 +27,7 @@ def test_comparison_uses_published_anchor_and_realized_move(tmp_path, monkeypatc
         "change_bps": [-25.0, 0.0],
     }).to_csv(processed / "fomc_meetings.csv", index=False)
     pd.DataFrame({
-        "date": ["2025-01-28", "2025-01-29", obs_date],
+        "date": ["2025-01-28", "2025-01-29", obs_date.strftime("%Y-%m-%d")],
         "sofr": [4.5, 4.5, 9.0],
     }).to_csv(processed / "sofr_daily.csv", index=False)
     pd.DataFrame({
