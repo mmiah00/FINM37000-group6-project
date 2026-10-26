@@ -16,8 +16,9 @@ the project:
 
 A separate script reads the team's processed SR1 settlements, daily SOFR, and
 target-rate decisions when those files are already on disk. It does not fetch
-them. See "Real data" below. SR3, horizons 2-6, and replacing this bootstrap
-with `sofr_pricing.fit_meeting_moves` are still open.
+them. See "Real data" below. That section's accuracy table is from a run of
+`python -m scripts.run_curve_compare_real` on those files. SR3, horizons 2-6,
+and replacing this bootstrap with `sofr_pricing.fit_meeting_moves` are still open.
 
 ## Which result this is
 
@@ -216,12 +217,31 @@ Trade dates whose in-progress contract month lacks a covering published
 fixing are excluded.
 
 If a file is missing, the script names the command that builds it and exits.
-The synthetic demo keeps working. There are no committed processed inputs in
-this worktree: `data/processed/sofr_futures_settlements.parquet`,
-`sofr_daily.csv`, and `fomc_meetings.csv` are all absent. Building the SR1
-settlements requires a Databento key, and neither `DATABENTO_API_KEY` nor
-`~/.databento_api_key` is available in this environment. The real comparison
-therefore cannot run here, and no real-data accuracy numbers can be reported.
+The synthetic demo keeps working. The processed files are not committed.
+`python -m scripts.run_curve_compare_real` was run against them. It scored
+1,166 settlement dates. The decision span covers 38 meetings. The scored rows
+use 37 distinct next-meeting dates, which is the `n_meetings` count beside
+the errors. Basis is `sofr_pricing.estimate_basis`, fixed before scoring.
+
+| method | n_obs | n_meetings | bias (bp) | MAE (bp) | RMSE (bp) |
+| --- | --- | --- | --- | --- | --- |
+| full_model | 1166 | 37 | 0.13 | 11.34 | 20.77 |
+| simple_curve | 1166 | 37 | -6.58 | 13.33 | 20.57 |
+
+| regime | n_obs | full_model MAE (bp) | simple_curve MAE (bp) |
+| --- | --- | --- | --- |
+| change | 572 | 9.78 | 25.05 |
+| hold | 594 | 12.83 | 2.05 |
+
+Mean (simplified - full model) error: -6.71 bp. Mean absolute difference: 15.18 bp.
+
+On meetings that change the target, the full model has the lower MAE. On holds,
+the simplified curve has the lower MAE, and the full model's RMSE across all
+1,166 dates (20.77 bp) is slightly larger than the simplified curve's (20.57 bp).
+The five worst meetings for the simplified curve are 2022-07-27, 2022-09-21,
+2022-06-15, 2022-11-02, and 2024-09-18, with simplified MAE from 53.71 bp down
+to 34.11 bp. This table is the daily SR1 bootstrap. It is not the monthly
+`fit_many` table in `final_visualizations/VISUALIZATIONS.md`.
 
 The full model still steps on the announcement date. `sofr_pricing` prices a
 move from the next business day (`effective_date`). Those two conventions
@@ -231,8 +251,8 @@ announcement date. Switching it is listed under "Pending".
 
 ## Pending
 
-- **Run the real script** once the three processed inputs are available, and
-  add its actual accuracy table here.
+- **Real script.** The accuracy table above is that run. The processed files
+  stay out of git.
 - **Horizons 2-6.** The implied table currently has only the next meeting.
   `build_forecast_errors` would score the later meetings if both methods wrote
   a cumulative change for each of them.

@@ -56,9 +56,9 @@ Historical market-implied forecasts are generated using the full SOFR futures pr
 
 The analysis samples the first available futures trading date in each month, beginning in February 2022.
 
-An earlier run of this pipeline called `fit_many` with its default basis of 0. That run reported 56 attempted monthly dates and 45 successful estimations. The other 11 dates failed because the contract strip or the FOMC calendar did not cover the fit. Those two counts describe that run. They are not a property the code promises for every sample.
+This rerun calls `fit_many` with `estimate_basis`: up to the last 20 SOFR fixings published before each observation date, SOFR minus the target-range midpoint. It attempted 56 monthly dates, from February 2022. All 56 had a basis. The basis on those dates ran from -0.1385 to 0.1180 percent, with median -0.0595. Forty-four dates produced a fit. Twelve did not: 2022-02-01 and 2022-03-01, because the realized SOFR file starts on 2022-01-03 and the pricer asked for a fixing on or before 2021-12-15, and ten later dates because the meeting file ends on 2026-09-16 while the futures strip runs past that meeting. Those counts describe this sample. They are not a property the code promises for every sample.
 
-Horizon h is kept only when the implied path has the h-th meeting after the observation date and that meeting is still in `fomc_meetings.csv`. A date near the end of the calendar can contribute to horizon 1 and drop out before horizon 6. `python -m scripts.prepare_visualization_inputs` prints `n_obs` and `n_meetings` for each horizon that is actually present, and writes them to `accuracy_by_horizon.csv`. The figure step writes the same counts to `forecast_accuracy_by_horizon.csv`. This note does not claim that every horizon has the same number of observations. The earlier draft's "45 observations at each of six horizons" (270 errors) is not repeated. That equality is not something the scoring code guarantees, and those error rows were not rebuilt for this follow-up.
+Horizon h is kept only when the implied path has the h-th meeting after the observation date and that meeting is still in `fomc_meetings.csv`. A date near the end of the calendar can contribute to horizon 1 and drop out before horizon 6. `python -m scripts.prepare_visualization_inputs` prints `n_obs` and `n_meetings` for each horizon that is actually present, and writes them to `accuracy_by_horizon.csv`. The figure step writes the same counts to `forecast_accuracy_by_horizon.csv`. On this sample the 44 successful dates each still have six meetings ahead, so every horizon has 44 observations and 30 distinct meetings. That equality is what this run printed. It is not something the scoring code guarantees.
 
 ### Historical Full versus Simplified Comparison
 
@@ -70,19 +70,30 @@ The baseline follows the Issue #6 convention of averaging up to five published S
 
 This historical adaptation assumes that the SOFR–policy spread remains approximately constant over the forecast horizon. The simplified forward is read on the meeting's effective date, not on the announcement date. When a hold has no effective date, that date is the next business day after the announcement.
 
-Both methodologies are scored on the same horizon-1 rows. The earlier basis-0 run described those rows as 45 dates. Read `n_obs` and `n_meetings` from the summary table before quoting a count.
-
-The bias, MAE, and RMSE below are from that basis-0 run. They were not regenerated after the basis change. See Limitations.
+Both methodologies are scored on the same horizon-1 rows from this rerun. The formatted summary rounds to two decimals.
 
 | Metric | Full Model | Simplified Curve |
 |---|---:|---:|
-| Bias (bps) | -7.33 | -7.34 |
-| MAE (bps) | 10.31 | 13.92 |
-| RMSE (bps) | 12.53 | 20.67 |
+| N | 44 | 44 |
+| Meetings | 30 | 30 |
+| Bias (bps) | -0.09 | -7.06 |
+| MAE (bps) | 6.15 | 14.34 |
+| RMSE (bps) | 8.20 | 21.76 |
 
-On that basis-0 run, the full model had lower MAE and RMSE than the simplified curve. The comparison is descriptive. It does not establish a causal advantage, and it is not the daily SR1 bootstrap in `CURVE_COMPARE.md`.
+The same 44 dates and 30 meetings appear at every horizon. Bias, MAE, and RMSE grow with the horizon:
 
-The saved summary places `n_meetings` (distinct meeting dates behind the row) beside bias, MAE, and RMSE. The table above is the earlier run's comparison and does not include that count.
+| Horizon | N | Meetings | Bias (bps) | MAE (bps) | RMSE (bps) |
+|---|---:|---:|---:|---:|---:|
+| 1 | 44 | 30 | -0.09 | 6.15 | 8.20 |
+| 2 | 44 | 30 | -5.57 | 15.12 | 19.75 |
+| 3 | 44 | 30 | -14.27 | 28.24 | 36.09 |
+| 4 | 44 | 30 | -25.27 | 38.51 | 50.59 |
+| 5 | 44 | 30 | -34.74 | 46.68 | 63.31 |
+| 6 | 44 | 30 | -43.36 | 54.15 | 73.11 |
+
+On this run the full model had lower MAE and RMSE than the simplified curve at the next meeting. The comparison is descriptive. It does not establish a causal advantage, and it is not the daily SR1 bootstrap in `CURVE_COMPARE.md`.
+
+`n_meetings` is the number of distinct meeting dates behind the row. It sits beside bias, MAE, and RMSE in the saved summary.
 
 ## Reproducing the Figures
 
@@ -146,11 +157,11 @@ python -m scripts.generate_final_figures \
   --errors data/processed/visualizations/forecast_errors.csv \
   --decisions data/processed/fomc_meetings.csv \
   --comparison data/processed/visualizations/model_comparison.csv \
-  --obs-date 2022-02-01 \
+  --obs-date 2022-04-01 \
   --output-dir figures/historical
 ```
 
-The pipeline generates PNG and PDF versions of the four figures, together with supporting summary tables and selected notable-meeting data.
+The pipeline generates PNG and PDF versions of the four figures, together with supporting summary tables and selected notable-meeting data. February and March 2022 did not produce a path, so the path chart uses 2022-04-01, the first successful observation date.
 
 The figure-generation entry point is `scripts/generate_final_figures.py`. Plotting functions are implemented in `final_visualizations/`, with shared Matplotlib formatting defined in `final_visualizations/style.py`.
 
@@ -158,12 +169,12 @@ The figure-generation entry point is `scripts/generate_final_figures.py`. Plotti
 
 The visualization functions have been exercised using synthetic forecast and comparison data. The automated tests cover figure creation, rate-level construction, model-comparison summaries, notable-meeting selection, and figure generation.
 
-The historical pipeline has also been executed using actual SOFR futures settlements and realized FOMC decisions.
+The historical pipeline has been executed on the processed SOFR futures settlements, daily SOFR, and realized FOMC decisions, with `estimate_basis` passed into `fit_many`.
 
-What the earlier basis-0 run reported, and what this follow-up checked:
+What this rerun reported:
 
-- That run reported 45 successful monthly estimations out of 56 attempts. Per-horizon counts were not rebuilt here. Use the printed `n_obs` column.
-- The comparison metrics in the table above come from that same run, at basis 0.
+- 56 monthly dates were attempted and 44 fits succeeded. Each of those 44 dates has horizons 1 through 6, with 44 observations and 30 distinct meetings at every horizon.
+- The comparison metrics in the table above are that rerun, not the earlier basis-0 figures.
 - Synthetic tests cover figure creation, the basis passed into `fit_many`, horizon counts that stop at the end of the meeting file, `n_meetings` beside bias, MAE, and RMSE, and the notable-meetings axis label.
 
 These checks establish that the integrated workflow produces historical outputs. They do not independently establish that the forecasting methodology is economically optimal or that the results are statistically significant.
@@ -186,12 +197,12 @@ The historical comparison extends Issue #6's simplified-curve approach to actual
 
   The basis changes the scored cumulative changes. On a synthetic strip where SOFR sits 6 bp below the policy rate, and published SOFR is supplied to the fit, fitting at basis 0 instead of that spread moves the first meeting's cumulative change by about 6.8 bp (about -2 bp becomes about -8.8 bp). Section 9 says the basis cancels when the error is a policy change rather than a SOFR level. That is true once the meeting moves themselves are right. A wrong basis is absorbed into those moves, mostly the nearest meeting.
 
-  The historical bias, MAE, and RMSE on this page were produced with basis 0, which is the default this script used before this change. They were not regenerated here. This checkout has no `data/processed/` futures panel, and no Databento key was available to build one with `scripts/fetch_sofr_futures.py`. Do not quote those figures as the result of the methodology's basis.
+  The historical bias, MAE, and RMSE on this page are from the rerun that passes that basis into `fit_many`. They replace the earlier basis-0 table.
 
 - **Horizon counts.** A horizon is missing when the meeting file runs out. Quote `n_obs` and `n_meetings` from the pipeline output. Do not quote 45 observations at each of six horizons unless that output says so.
 
 - **Monthly sampling:** The historical analysis uses approximately monthly observation dates rather than every trading day. Results may differ under denser sampling.
-- **Estimation coverage:** The basis-0 run reported eleven attempted dates that did not produce successful estimations, including dates affected by the September 2026 sample boundary. That split was not rebuilt here.
+- **Estimation coverage:** Twelve of the 56 attempted dates did not produce a fit. Two early dates lack a SOFR fixing at the start of the SR3 window. Ten later dates run past the last meeting in `fomc_meetings.csv` (2026-09-16).
 - **SOFR–policy spread:** The simplified-curve leg still converts a SOFR forward into a policy change with a short trailing SOFR anchor (up to five fixings). That window is separate from the full model's 20-fixing `estimate_basis` window.
 - **Contract conventions:** The simplified bootstrap does not explicitly model FOMC meeting timing or fully adjust for the already-realized portion of active front-month futures contracts.
 - **Effective dates:** The simplified forward is read on the meeting's effective date, not on the announcement date. For a hold with no effective date, that date is the next business day after the announcement.
