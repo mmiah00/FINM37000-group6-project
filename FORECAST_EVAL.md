@@ -7,10 +7,11 @@ split by policy regime.
 
 **Status:** the synthetic evaluation runs here. Historical real-data evaluation runs through
 the Issue #7 workflow in [final_visualizations/VISUALIZATIONS.md](final_visualizations/VISUALIZATIONS.md).
-That rerun passes `estimate_basis` into `fit_many`. At the next meeting it has 44 observations
-and 30 meetings: full-model bias -0.09 bp, MAE 6.15 bp, RMSE 8.20 bp; simplified curve bias
--7.06 bp, MAE 14.34 bp, RMSE 21.76 bp. Horizons 1 through 6 each have those same two counts
-on this sample. The daily SR1 bootstrap is a different test; its real-data table is in
+That rerun passes `estimate_basis` into `fit_many`. At the next meeting it has 56 observations
+and 37 meetings: full-model bias 0.00 bp, MAE 5.63 bp, RMSE 7.60 bp; simplified curve bias
+-6.66 bp, MAE 12.72 bp, RMSE 19.77 bp. Counts fall as the realized calendar ends: horizon 6
+has 48 observations and 32 meetings, with full-model bias -53.64 bp, MAE 63.54 bp and RMSE
+90.25 bp. The daily SR1 bootstrap is a different test; its real-data table is in
 [CURVE_COMPARE.md](CURVE_COMPARE.md).
 
 ## Definitions
