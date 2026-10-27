@@ -223,3 +223,55 @@ def test_invalid_sofr_duplicate_date():
 
     with pytest.raises(ValueError, match = "Duplicate SOFR"):
         validate_sofr(df)
+
+
+def test_sofr_is_fetched_from_before_the_sample_starts():
+    """A contract running on the first sample day was priced off earlier fixings.
+
+    The SR3 contract in force on 2022-02-01 began on 2021-12-15, and the pricer
+    needs a fixing on or before that day. A SOFR file that starts on the sample
+    start therefore cannot price February and March 2022.
+    """
+    from fomc_data.config import SOFR_FETCH_START, START
+
+    assert SOFR_FETCH_START < START
+    assert SOFR_FETCH_START <= pd.Timestamp("2021-12-01")
+
+
+def test_fetch_rate_data_requests_sofr_from_the_lead_in_start(tmp_path, monkeypatch):
+    import scripts.fetch_rate_data as script
+    from fomc_data.config import SOFR_FETCH_START
+
+    requested = {}
+
+    def fake_sofr(start):
+        requested["start"] = start
+        return pd.DataFrame({"date": pd.to_datetime(["2021-10-01", "2021-10-04"]), "sofr": [0.05, 0.05]})
+
+    monkeypatch.setattr(script, "fetch_sofr", fake_sofr)
+    monkeypatch.setattr(script, "fetch_effr", lambda: pd.DataFrame({"date": pd.to_datetime(["2022-01-03"]), "effr": [0.08]}))
+    monkeypatch.setattr(script, "build_fomc_decisions", lambda: pd.DataFrame({"meeting_date": pd.to_datetime(["2022-01-26"])}))
+    monkeypatch.setattr(script, "validate_fomc_decisions", lambda frame: frame)
+    monkeypatch.setattr(script, "ensure_dirs", lambda: None)
+    for name in ("EFFR_CSV", "SOFR_CSV", "FOMC_CSV"):
+        monkeypatch.setattr(script, name, tmp_path / f"{name}.csv")
+
+    script.main()
+
+    assert requested["start"] == SOFR_FETCH_START
+    assert pd.read_csv(tmp_path / "SOFR_CSV.csv")["date"].iloc[0] == "2021-10-01"
+
+
+def test_scheduled_dates_add_announced_meetings_without_touching_the_realized_calendar():
+    """Announced future meetings schedule the estimator but never enter the decision table."""
+    from fomc_data.fomc_calendar import scheduled_meeting_dates
+
+    realized = list(fetch_fomc_calendar()["meeting_date"])
+    scheduled = scheduled_meeting_dates()
+
+    assert scheduled == sorted(set(scheduled))
+    assert set(realized) < set(scheduled)
+    extra = [day for day in scheduled if day not in set(realized)]
+    assert extra == [pd.Timestamp("2026-10-28"), pd.Timestamp("2026-12-09")]
+    # They all come after the last realized meeting, so nothing needs an outcome for them.
+    assert min(extra) > max(realized)

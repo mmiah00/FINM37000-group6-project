@@ -17,6 +17,9 @@ import pandas as pd
 
 from final_visualizations.style import COLORS
 
+#days the last step is drawn past the final meeting, about one meeting interval.
+TAIL_DAYS = 45
+
 
 def plot_fed_paths(errors, decisions, obs_date):
     """
@@ -66,6 +69,12 @@ def plot_fed_paths(errors, decisions, obs_date):
     implied = [anchor] + forecasts["implied_rate"].tolist()
     realized = [anchor] + forecasts["realized_rate"].tolist()
 
+    #a step plot draws each level forward to the next date, so without a closing date the
+    #last level has no width and shows as a vertical line at the right edge of the chart.
+    dates.append(dates[-1] + pd.DateOffset(days = TAIL_DAYS))
+    implied.append(implied[-1])
+    realized.append(realized[-1])
+
     #plot both paths.
     fig, ax = plt.subplots(figsize = (10, 5))
 
@@ -86,7 +95,7 @@ def plot_fed_paths(errors, decisions, obs_date):
     ax.tick_params(axis = "x", rotation = 0)
 
     ax.grid(axis = "y", alpha = 0.3)
-    ax.legend(loc = "upper right")
+    ax.legend(loc = "best")
 
     fig.tight_layout()
 

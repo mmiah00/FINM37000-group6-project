@@ -57,7 +57,10 @@ def main():
     print("Calendar: fomc_data.fomc_calendar.fetch_fomc_calendar")
     print("Basis:    sofr_pricing.estimate_basis (fixed before scoring)")
     print("Scores:   forecast_eval.build_forecast_errors, horizon 1\n")
-    print(f"Meetings scored: {len(world.meeting_dates)}")
+    # The calendar lists every meeting, but a meeting is only scored if some observation date has it
+    # as its next meeting. These two counts differ when the SOFR file starts too late to price the
+    # dates before the first meeting (see SOFR_FETCH_START in fomc_data/config.py).
+    print(f"Meetings in the calendar: {len(world.meeting_dates)}, scored as a next meeting: {results['next_meeting'].nunique()}")
     print(f"Observation dates: {len(results)}\n")
 
     print("Next-meeting-horizon accuracy, full model vs. simplified curve:")

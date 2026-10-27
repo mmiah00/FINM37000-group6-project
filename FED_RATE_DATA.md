@@ -22,6 +22,10 @@ The resulting datasets provide realized monetary policy outcomes for evaluating 
 - https://fred.stlouisfed.org/series/DFEDTARL
 - https://fred.stlouisfed.org/series/DFEDTARU
 
+## SOFR starts before the sample
+
+Daily SOFR is fetched from three months before the sample start (2021-10-01), not from 2022-01-01. A futures contract that is already running on the first sample day was priced off earlier fixings: the SR3 contract in force on 2022-02-01 began on 2021-12-15, and the pricer needs a fixing on or before that day. With the file starting on 2022-01-03, the February and March 2022 observation dates could not be fitted, and the 2022-01-26 intraday fit had to run without the SOFR splice. `SOFR_FETCH_START` in `fomc_data/config.py` sets the lead-in. EFFR and the FOMC table still start at the sample start.
+
 ## Data Processing
 
 1. Retrieve historical daily EFFR and SOFR observations from the New York Fed's public API.
@@ -105,7 +109,7 @@ python -m pytest tests/test_rate_data.py -v
 
 The ten automated tests check meeting-calendar ordering and uniqueness, acceptance of a valid policy decision, rejection of an incorrectly calculated basis-point change, and synthetic SOFR futures alignment. Alignment tests include multiple meetings within one contract, a month-end announcement whose effective date falls in the next contract period, and the fallback for a hold without a recorded effective date. Three additional tests cover valid SOFR observations, missing SOFR rates, and duplicate SOFR dates.
 
-These tests establish internal consistency but do not independently verify the historical policy decisions against FOMC statements. The data collection script has also successfully generated 1,190 EFFR observations, 1,184 SOFR observations, and 38 FOMC meeting records for the sample.
+These tests establish internal consistency but do not independently verify the historical policy decisions against FOMC statements. The data collection script has also successfully generated 1,190 EFFR observations, 1,246 SOFR observations, and 38 FOMC meeting records for the sample.
 
 SOFR fixings are published after their effective dates, generally on the next business day. Downstream pricing must respect when fixings became available to avoid look-ahead bias, and must handle weekends and holidays appropriately when calculating realized accruals.
 

@@ -20,6 +20,7 @@ import databento as db
 import pandas as pd
 
 from sofr_data import config
+from sofr_data.retry import call_with_retries
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +125,7 @@ def _cached_fetch(path: Path, fetch: callable, refresh: bool) -> pd.DataFrame:
         return pd.read_parquet(path)
 
     logger.info("fetching   %s", path.name)
-    frame = fetch()
+    frame = call_with_retries(fetch, label=path.name)
     try:
         frame.to_parquet(path, index=False)
     except Exception as exc:  # caching is best-effort; never lose a paid pull
@@ -249,12 +250,12 @@ def estimate_cost(
             {
                 "root": root,
                 "schema": "statistics",
-                "records": client.metadata.get_record_count(
+                "records": call_with_retries(lambda: client.metadata.get_record_count(
                     schema="statistics", start=start.date(), end=end_exclusive, **shared
-                ),
-                "cost_usd": client.metadata.get_cost(
+                ), label="get_record_count"),
+                "cost_usd": call_with_retries(lambda: client.metadata.get_cost(
                     schema="statistics", start=start.date(), end=end_exclusive, **shared
-                ),
+                ), label="get_cost"),
             }
         )
 
@@ -267,13 +268,13 @@ def estimate_cost(
             {
                 "root": root,
                 "schema": f"definition (~{len(snapshots)} snapshots)",
-                "records": client.metadata.get_record_count(
+                "records": call_with_retries(lambda: client.metadata.get_record_count(
                     schema="definition", **one_day, **shared
-                )
+                ), label="get_record_count")
                 * len(snapshots),
-                "cost_usd": client.metadata.get_cost(
+                "cost_usd": call_with_retries(lambda: client.metadata.get_cost(
                     schema="definition", **one_day, **shared
-                )
+                ), label="get_cost")
                 * len(snapshots),
             }
         )

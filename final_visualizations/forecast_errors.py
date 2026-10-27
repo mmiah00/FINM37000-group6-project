@@ -36,11 +36,11 @@ def plot_forecast_errors_by_horizon(errors):
     #panel A: Distribution of forecast errors.
     samples = [data.loc[data["horizon"] == h, "error_bps"].dropna().to_numpy() for h in horizons]
 
-    bp = ax_dist.boxplot(samples, 
+    bp = ax_dist.boxplot(samples,
                          positions = horizons,
                          whis = (5, 95),
                          showfliers = False,
-                         patch_artist = True, 
+                         patch_artist = True,
                          widths = 0.5,
                          medianprops = {"color": COLORS["orange"], "linewidth": 2},
                          boxprops = {"color": COLORS["navy"], "linewidth": 1.5},

@@ -5,9 +5,13 @@ FOMC decisions that followed: forecast errors in basis points, bias, MAE, RMSE a
 rate at horizons of 1 to 6 meetings ahead, how accuracy changes as a meeting approaches, and a
 split by policy regime.
 
-**Status:** the evaluation runs on **synthetic data**. It has no real results yet, because the real
-implied paths depend on #4 and the realized decisions on #2 (PR #13). Neither package is imported
-here; the two tables below are the only connection.
+**Status:** the synthetic evaluation runs here. Historical real-data evaluation runs through
+the Issue #7 workflow in [final_visualizations/VISUALIZATIONS.md](final_visualizations/VISUALIZATIONS.md).
+That rerun passes `estimate_basis` into `fit_many`. At the next meeting it has 44 observations
+and 30 meetings: full-model bias -0.09 bp, MAE 6.15 bp, RMSE 8.20 bp; simplified curve bias
+-7.06 bp, MAE 14.34 bp, RMSE 21.76 bp. Horizons 1 through 6 each have those same two counts
+on this sample. The daily SR1 bootstrap is a different test; its real-data table is in
+[CURVE_COMPARE.md](CURVE_COMPARE.md).
 
 ## Definitions
 

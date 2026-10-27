@@ -13,22 +13,34 @@ import pandas as pd
 from final_visualizations.style import COLORS
 
 
+def _distinct_meetings(frame):
+    """Distinct meeting dates behind ``frame``."""
+    for column in ("meeting_date", "next_meeting"):
+        if column in frame.columns:
+            return int(pd.to_datetime(frame[column]).nunique())
+    raise ValueError("model comparison needs meeting_date or next_meeting to report n_meetings")
+
+
 def summarize_model_comparison(results):
     """
     Summarize forecast accuracy for both methodologies.
 
     Args:
-    - results (pd.DataFrame): Output of curve_compare.compare.run_comparison().
+    - results (pd.DataFrame): Output of the historical comparison script, or of
+      curve_compare's next-meeting comparison. A ``meeting_date`` or
+      ``next_meeting`` column supplies ``n_meetings``.
 
-    Returns (pd.DataFrame): Bias, MAE, RMSE, and observation counts.
+    Returns (pd.DataFrame): n_obs, n_meetings, bias, MAE, and RMSE.
     """
     rows = []
 
     for method, column in [("Full model", "full_model_error_bps"), ("Simplified curve", "simple_curve_error_bps")]:
         errors = results[column].dropna()
+        scored = results.loc[errors.index]
 
         rows.append({"method": method,
-                     "n_obs": len(errors),
+                     "n_obs": int(len(errors)),
+                     "n_meetings": _distinct_meetings(scored),
                      "bias_bps": errors.mean(),
                      "mae_bps": errors.abs().mean(),
                      "rmse_bps": np.sqrt((errors**2).mean())})
@@ -97,4 +109,3 @@ def plot_model_comparison(results):
     fig.tight_layout()
 
     return fig
-

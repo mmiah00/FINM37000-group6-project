@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from curve_compare.full_model import anchor_sofr_rate
+from curve_compare.full_model import anchor_sofr_rate, published_sofr
 from curve_compare.simple_curve import simple_curve_path
 
 
@@ -26,6 +26,7 @@ def main():
 
     daily_sofr = sofr.set_index("date")["sofr"].sort_index()
     meeting_dates = decisions["meeting_date"].tolist()
+    meeting_moves = decisions.set_index("meeting_date")["change_bps"]
 
     rows = []
 
@@ -37,7 +38,10 @@ def main():
 
         effective_date = decision["effective_date"]
 
-        #holds have no new policy effective date. Evaluate the simplified curve on the next business day instead.
+        # Holds have no new policy effective date, so use the next business day.
+        # On every meeting, including ones that change the target, the
+        # simplified forward is read on this effective date, not on the
+        # announcement date.
         if pd.isna(effective_date):
             effective_date = meeting_date + pd.offsets.BDay(1)
 
@@ -52,9 +56,9 @@ def main():
         sr1["month_end"] = pd.to_datetime(sr1["month_end"])
 
         #use only fixings known by the observation date.
-        known_fixings = daily_sofr.loc[:obs_date]
+        known_fixings = published_sofr(daily_sofr, obs_date)
 
-        baseline = anchor_sofr_rate(known_fixings, obs_date, meeting_dates, window_days = 5)
+        baseline = anchor_sofr_rate(known_fixings, obs_date, meeting_dates, meeting_moves, window_days = 5)
 
         simple_rate = float(simple_curve_path(sr1, obs_date, [effective_date]).iloc[0])
 

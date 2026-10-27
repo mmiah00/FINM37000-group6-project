@@ -16,8 +16,20 @@ the project:
 
 A separate script reads the team's processed SR1 settlements, daily SOFR, and
 target-rate decisions when those files are already on disk. It does not fetch
-them. See "Real data" below. SR3, horizons 2-6, and replacing this bootstrap
-with `sofr_pricing.fit_meeting_moves` are still open.
+them. See "Real data" below. That section's accuracy table is from a run of
+`python -m scripts.run_curve_compare_real` on those files. SR3, horizons 2-6,
+and replacing this bootstrap with `sofr_pricing.fit_meeting_moves` are still open.
+
+## Which result this is
+
+`final_visualizations/VISUALIZATIONS.md` (Issue #7) also compares a full model
+with this simplified curve, and it answers a different question. That page fits
+`sofr_pricing.fit_many` on the SR1 and SR3 strip once a month, scores cumulative
+errors out to six meetings, and at the next meeting compares that path with the
+simplified SR1 curve. This document compares a daily SR1 bootstrap with the
+simplified curve at the next meeting only. Quote this document for the
+bootstrap. Quote the Issue #7 page for the monthly full-strip path. The two
+tables are not the same test.
 
 ## Scope
 
@@ -205,12 +217,63 @@ Trade dates whose in-progress contract month lacks a covering published
 fixing are excluded.
 
 If a file is missing, the script names the command that builds it and exits.
-The synthetic demo keeps working. There are no committed processed inputs in
-this worktree: `data/processed/sofr_futures_settlements.parquet`,
-`sofr_daily.csv`, and `fomc_meetings.csv` are all absent. Building the SR1
-settlements requires a Databento key, and neither `DATABENTO_API_KEY` nor
-`~/.databento_api_key` is available in this environment. The real comparison
-therefore cannot run here, and no real-data accuracy numbers can be reported.
+The synthetic demo keeps working. The processed files are not committed.
+`python -m scripts.run_curve_compare_real` scores 1,182 settlement dates against
+38 meetings (the `n_meetings` count beside the errors). The SOFR file starts three
+months before the sample (see `SOFR_FETCH_START` in `fomc_data/config.py`), so the
+dates before the first meeting can be priced and every meeting is a scored target.
+Basis is `sofr_pricing.estimate_basis`, fixed before scoring.
+
+| method | n_obs | n_meetings | bias (bp) | MAE (bp) | RMSE (bp) |
+| --- | --- | --- | --- | --- | --- |
+| full_model | 1182 | 38 | 0.15 | 11.20 | 20.63 |
+| simple_curve | 1182 | 38 | -6.49 | 13.15 | 20.43 |
+
+| regime | n_obs | full_model MAE (bp) | simple_curve MAE (bp) |
+| --- | --- | --- | --- |
+| change | 572 | 9.78 | 25.05 |
+| hold | 610 | 12.53 | 2.00 |
+
+Mean (simplified - full model) error: -6.64 bp. Mean absolute difference: 14.99 bp.
+
+On meetings that change the target, the full model has the lower MAE. On holds,
+the simplified curve has the lower MAE, and the full model's RMSE across all
+1,182 dates (20.63 bp) is slightly larger than the simplified curve's (20.43 bp).
+The five worst meetings for the simplified curve are 2022-07-27, 2022-09-21,
+2022-06-15, 2022-11-02, and 2024-09-18, with simplified MAE from 53.71 bp down
+to 34.11 bp. This table is the daily SR1 bootstrap. It is not the monthly
+`fit_many` table in `final_visualizations/VISUALIZATIONS.md`.
+
+### Why the bootstrap loses on holds: meetings late in the month
+
+The full model's error follows how late in the month the next meeting falls, which
+is the 31x amplification described above, now measured on real data. The ratio is
+the days in the contract month divided by the days left after the meeting.
+
+| Meeting position | Meetings | Dates | Bootstrap MAE (bp) | Simple curve MAE (bp) |
+| --- | --- | --- | --- | --- |
+| 2x or less | 16 | 497 | 6.60 | 14.48 |
+| 2 to 5x | 11 | 373 | 7.41 | 13.83 |
+| 5 to 10x | 4 | 104 | 9.51 | 21.40 |
+| over 10x | 7 | 208 | 29.83 | 4.66 |
+
+Across the 38 meetings the correlation between that ratio and the bootstrap's error
+is 0.82. For the seven meetings in the last days of a month the bootstrap's RMSE is
+43.9 bp. Most of those are holds, which is why the bootstrap loses on holds.
+
+The project's own regularized estimator (`sofr_pricing.fit_many`, SR1 only so the
+information matches) does not have this failure. On the 1,106 dates where a
+nine-month strip fits inside the meeting schedule:
+
+| method | MAE (bp) | RMSE (bp) | MAE, meetings over 10x (bp) |
+| --- | --- | --- | --- |
+| bootstrap | 11.08 | 20.89 | 31.4 |
+| regularized fit | 8.26 | 10.67 | 5.7 |
+| smooth curve | 13.43 | 20.86 | 5.2 |
+
+The regularized fit is the estimator behind the monthly results in the README and
+in `final_visualizations/VISUALIZATIONS.md`. The bootstrap is kept as a simple,
+transparent baseline, and its late-month failure is a finding, not a bug.
 
 The full model still steps on the announcement date. `sofr_pricing` prices a
 move from the next business day (`effective_date`). Those two conventions
@@ -220,14 +283,15 @@ announcement date. Switching it is listed under "Pending".
 
 ## Pending
 
-- **Run the real script** once the three processed inputs are available, and
-  add its actual accuracy table here.
+- **Real script.** The accuracy table above is that run. The processed files
+  stay out of git.
 - **Horizons 2-6.** The implied table currently has only the next meeting.
   `build_forecast_errors` would score the later meetings if both methods wrote
   a cumulative change for each of them.
 - **`fit_meeting_moves`.** This bootstrap is still a separate SR1 inversion.
-  Scoring `sofr_pricing.fit_meeting_moves` against the simplified curve would
-  test the project's own estimator.
+  Issue #7 scores `sofr_pricing.fit_many` (SR1 and SR3, once a month) against
+  the simplified curve. Scoring this package's daily SR1 bootstrap against
+  `fit_meeting_moves` on the same dates is still open.
 - **Effective date.** The step is the announcement date, not
   `sofr_pricing.effective_date`.
 - **SR3** is out of scope.
