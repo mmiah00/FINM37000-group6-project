@@ -109,7 +109,8 @@ def estimate_basis(sofr_fixings, decisions, end_date, n_fixings=20):
     """Average gap SOFR minus policy rate over the last `n_fixings` fixings up to `end_date`.
 
     This is the "recent realized spread" that METHODOLOGY.md Section 2 uses to
-    fix the basis. It needs PUBLISHED daily SOFR, which no issue collects yet.
+    fix the basis. It needs published daily SOFR, such as data/processed/sofr_daily.csv
+    written by fomc_data (Issue #2).
     """
     end_date = pd.Timestamp(end_date)
     recent = sofr_fixings[sofr_fixings.index <= end_date].tail(n_fixings)
