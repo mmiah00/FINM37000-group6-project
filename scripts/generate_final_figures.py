@@ -45,7 +45,7 @@ def generate_figures(errors, decisions, comparison, obs_date, output_dir):
     Generate the available final figures and summary tables.
     """
     apply_style()
-    
+
     output_dir = Path(output_dir)
     output_dir.mkdir(parents = True, exist_ok = True)
 
@@ -66,8 +66,11 @@ def generate_figures(errors, decisions, comparison, obs_date, output_dir):
     fig = plot_notable_meetings(notable)
     save_figure(fig, output_dir, "04_notable_meetings")
 
-    #summary tables.
-    export_summary_tables(errors, comparison, output_dir)
+    #summary tables. n_obs and n_meetings are the counts for the horizons
+    #that are actually in `errors`, not a padded six-horizon grid.
+    horizon_summary, _model_summary = export_summary_tables(errors, comparison, output_dir)
+    print("Observation count by horizon (n_obs) and distinct meetings (n_meetings):")
+    print(horizon_summary[["n_obs", "n_meetings"]].to_string())
 
     #preserve the selected episodes for interpretation.
     notable.to_csv(output_dir / "notable_meetings.csv")

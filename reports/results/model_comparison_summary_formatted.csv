@@ -1,0 +1,3 @@
+Method,N,Meetings,Bias (bp),MAE (bp),RMSE (bp)
+Full model,56,37,0.00,5.63,7.60
+Simplified curve,56,37,-6.66,12.72,19.77

@@ -33,12 +33,20 @@ def test_model_comparison_summary(sample_comparison):
 
     assert summary.loc["Full model", "n_obs"] == 4
     assert summary.loc["Simplified curve", "n_obs"] == 4
+    # Four rows, two meeting dates, reported beside bias, MAE, and RMSE.
+    assert summary.loc["Full model", "n_meetings"] == 2
+    assert summary.loc["Simplified curve", "n_meetings"] == 2
 
     assert summary.loc["Full model", "bias_bps"] == 0
     assert summary.loc["Simplified curve", "bias_bps"] == 0
 
     assert summary.loc["Full model", "mae_bps"] == 3.5
     assert summary.loc["Simplified curve", "mae_bps"] == 12.0
+
+
+def test_model_comparison_requires_meeting_dates(sample_comparison):
+    with pytest.raises(ValueError, match="meeting_date or next_meeting"):
+        summarize_model_comparison(sample_comparison.drop(columns="next_meeting"))
 
 
 def test_model_comparison_figure(sample_comparison):

@@ -15,6 +15,13 @@ FOMC_DATES = {2022: ["01-26", "03-16", "05-04", "06-15", "07-27", "09-21", "11-0
               2025: ["01-29", "03-19", "05-07", "06-18", "07-30", "09-17", "10-29", "12-10"],
               2026: ["01-28", "03-18", "04-29", "06-17", "07-29", "09-16"]}
 
+#announced future meetings: the dates are public, the decisions are not. These are
+#only for scheduling. The estimator has to know a meeting is coming to avoid loading
+#its effect onto the meetings it can see, but there is no outcome to score, so they
+#stay out of `fetch_fomc_calendar` and the decision table. Confirm and extend this
+#list against https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm.
+UPCOMING_FOMC_DATES = {2026: ["10-28", "12-09"]}
+
 
 def fetch_fomc_calendar(start = START, end = END):
     """
@@ -39,3 +46,21 @@ def fetch_fomc_calendar(start = START, end = END):
     df["meeting_number"] = df.groupby("year").cumcount() + 1
 
     return df[["meeting_date", "year", "meeting_number"]]
+
+
+def scheduled_meeting_dates(start = START):
+    """Every announcement date the estimator should know about, oldest first.
+
+    This is the realized calendar plus the announced meetings that have not
+    happened (`UPCOMING_FOMC_DATES`). Use it as the meeting schedule when
+    fitting. Use `fetch_fomc_calendar` for anything that needs an outcome.
+
+    Returns (list of pd.Timestamp): midnight dates with no time zone.
+    """
+    years = {**FOMC_DATES}
+    for year, month_days in UPCOMING_FOMC_DATES.items():
+        years[year] = [*years.get(year, []), *month_days]
+
+    dates = pd.to_datetime([f"{year}-{month_day}" for year, month_days in years.items() for month_day in month_days])
+    dates = sorted(set(dates))
+    return [pd.Timestamp(day) for day in dates if day >= pd.Timestamp(start)]

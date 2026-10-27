@@ -52,9 +52,10 @@ def test_plot_rate_levels(sample_errors, sample_decisions):
     realized = ax.lines[0].get_ydata()
     implied = ax.lines[1].get_ydata()
 
-    #starting midpoint: (4.25 + 4.50) / 2 = 4.375%.
-    assert list(realized) == [4.375, 4.125, 3.875, 3.875]
-    assert list(implied) == [4.375, 4.125, 3.875, 3.875]
+    #starting midpoint: (4.25 + 4.50) / 2 = 4.375%. The last level repeats once so the final
+    #step has a width (see test_last_step_has_a_width).
+    assert list(realized) == [4.375, 4.125, 3.875, 3.875, 3.875]
+    assert list(implied) == [4.375, 4.125, 3.875, 3.875, 3.875]
 
 
 def test_missing_observation_date(sample_errors, sample_decisions):
@@ -91,6 +92,17 @@ def test_mixed_hikes_cuts_and_unsorted_dates(sample_decisions):
     implied = list(ax.lines[1].get_ydata())
     realized = list(ax.lines[0].get_ydata())
 
-    #starting midpoint = 4.375%.
-    assert implied == [4.375, 4.625, 4.375, 4.125]
-    assert realized == [4.375, 4.625, 4.125, 3.875]
+    #starting midpoint = 4.375%; the last level repeats once to give the final step a width.
+    assert implied == [4.375, 4.625, 4.375, 4.125, 4.125]
+    assert realized == [4.375, 4.625, 4.125, 3.875, 3.875]
+
+
+def test_last_step_has_a_width(sample_errors, sample_decisions):
+    """The final level must be drawn forward in time, not as a vertical line at the edge."""
+    from final_visualizations.fed_paths import TAIL_DAYS
+
+    fig = plot_fed_paths(sample_errors, sample_decisions, "2025-02-03")
+    dates = list(fig.axes[0].lines[0].get_xdata())
+
+    assert dates[-1] - dates[-2] == pd.Timedelta(days=TAIL_DAYS)
+    assert dates[-2] == pd.Timestamp("2025-06-18")  # the last meeting is still the last change

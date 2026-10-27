@@ -10,9 +10,9 @@ Two sets of charts are committed, and they answer different questions.
 
 `reports/intraday/` is a drill. We built fake minute bars with a jump we chose, at 14:00, and checked that the fitter gives that jump back. It does, to about a hundred-thousandth of a basis point. The September panel ends at −50 bp on the front meeting because we typed −50. The titles say "Synthetic check".
 
-`reports/intraday/real/` is the downloaded book. Databento `GLBX.MDP3` `ohlcv-1m` for the 33 announcements the estimator can cover, 13:00 to 16:00 Eastern. `metadata.get_cost` on that exact request quoted **$0.0000** before the download. The file has 40,355 bars. The figures there are market prices run through the team's fitter.
+`reports/intraday/real/` is the downloaded book. Databento `GLBX.MDP3` `ohlcv-1m` for the 35 announcements the estimator can cover, 13:00 to 16:00 Eastern. `metadata.get_cost` on that exact request quoted **$0.0000** before the download. The file has 42,334 bars. The figures there are market prices run through the team's fitter.
 
-For the talk: one sentence of method, then `reports/intraday/real/repricing_paths.png`. The three lines are the fully identified afternoons with the largest horizon-1 move from 13:55 to 16:00: 18 September 2024 (−11.12 bp), 29 October 2025 (+4.49 bp), and 15 June 2022 (+3.77 bp). Leave the synthetic September panel out of the talk.
+For the talk: one sentence of method, then `reports/intraday/real/repricing_speed.png`, which shows where the repricing happens across all 35 afternoons. Then `surprise_check.png`, which shows the fit recovers the announced surprise, and `repricing_paths.png` for three afternoons chosen by their true surprise. Say plainly that one afternoon the fit got wrong (29 October 2025, below) and that the study checks itself against the announced move. Leave the synthetic September panel out of the talk.
 
 ## Questions a TA is likely to ask
 
@@ -32,7 +32,7 @@ Different contracts cover different days. An SR1 is a calendar-month average. An
 
 The daily project fits 13 SR1 months and 6 SR3 quarters. On 18 September 2024 and 18 December 2024 that strip has 12 meetings and rank 11, and the condition number is on the order of 1e17. A planted path can still come back, because the unidentified direction happens not to be the one we planted, but the fit is not identified. Eight SR1 and three SR3 are the strip this study uses. The window is fixed at 60 minutes before the statement and 120 minutes after. There is no command-line switch for a longer strip or a different window.
 
-On the real sample that strip is full rank at the 16:00 snapshot on 29 of 33 afternoons. Condition numbers there are usually about 9 to 20. A few identified days are larger and still full rank; the highest is about 1600, on 2025-03-19, which has 7 meetings and rank 7. Four afternoons have 7 meetings and rank 6, so the path is not unique: 2022-03-16, 2022-09-21, 2023-03-22, and 2023-09-20. Those four stay in the tables and on the horizon fan. The three-panel path chart keeps them off. It draws only afternoons that are fully identified at 16:00, and only the three with the largest absolute horizon-1 change. If a partial run has no fully identified afternoon, it skips the path chart and still writes the horizon chart and tables.
+On the real sample that strip is full rank at the 16:00 snapshot on 31 of 35 afternoons. Condition numbers there are usually about 9 to 20 (median 15). A few identified days are larger and still full rank; the highest is about 1600, on 2025-03-19, which has 7 meetings and rank 7. Four afternoons have 7 meetings and rank 6, so the path is not unique: 2022-03-16, 2022-09-21, 2023-03-22, and 2023-09-20. Those four stay in the tables and on the horizon fan. The path chart keeps them off. It draws only afternoons that are usable, meaning fully identified at 16:00 with a fitted level within 2 bp of the announced move, and ranks them by true surprise (the announced move minus the 13:55 level). If a run has no usable afternoon, it skips the path chart and still writes the horizon chart and tables.
 
 ### 4. What if a deferred contract does not trade at 14:10?
 
@@ -50,70 +50,97 @@ The drill in `reports/intraday/` passes no SOFR series, so its basis is zero and
 
 ## What the real book did
 
-Sample: the 33 covered announcements, 2022-01-26 through 2026-01-28. Five later 2026 dates are outside the estimator because the published calendar ends 2026-09-16. Every one of the 132 snapshots (33 days, four clocks) converged. Root mean squared pricing error at 16:00 is about 0.09 to 0.75 bp.
+Sample: the 35 covered announcements, 2022-01-26 through 2026-04-29. Three later announcements (2026-06-17, 2026-07-29 and 2026-09-16) are outside the estimator because their contract strip reaches 2027 meetings that are not yet in the calendar. Every one of the 140 snapshots (35 days, four clocks) converged, and all of them splice published SOFR. Root mean squared pricing error at 16:00 is about 0.09 to 0.75 bp.
 
-The table is horizon 1, in basis points. The 14:15, 14:45, and 16:00 columns are the change in the implied cumulative policy rate versus the 13:55 book (`delta_cum_bps`). "Level at 16:00" is the implied cumulative change itself, from this morning's target midpoint through today's meeting. "Identified" is full Jacobian rank at 16:00.
+The table is horizon 1, in basis points. The 14:15, 14:45 and 16:00 columns are the change in the implied cumulative policy rate versus the 13:55 book (`delta_cum_bps`). "Level at 16:00" is the implied cumulative change itself, from this morning's target midpoint through today's meeting. "Announced" is the change the Fed delivered. "Closing error" is the level at 16:00 minus the announced change, which should be near zero (next section). "Usable" means fully identified at 16:00 with a closing error inside 2 bp.
 
-| date | 14:15 | 14:45 | 16:00 | level at 16:00 | identified |
-| --- | ---: | ---: | ---: | ---: | --- |
-| 2022-01-26 | -0.52 | -0.96 | -1.04 | +0.14 | yes |
-| 2022-03-16 | -2.06 | -1.64 | -2.05 | +26.54 | no |
-| 2022-05-04 | -1.88 | -1.97 | -1.94 | +50.62 | yes |
-| 2022-06-15 | +3.49 | +3.61 | +3.77 | +74.14 | yes |
-| 2022-07-27 | -1.50 | -1.95 | -2.00 | +75.64 | yes |
-| 2022-09-21 | -3.49 | -3.35 | -3.52 | +75.44 | no |
-| 2022-11-02 | -0.28 | -0.21 | -0.18 | +76.08 | yes |
-| 2022-12-14 | -0.10 | -0.08 | -0.48 | +50.93 | yes |
-| 2023-02-01 | -0.72 | -0.75 | -0.69 | +25.56 | yes |
-| 2023-03-22 | +3.24 | +3.77 | +3.27 | +24.91 | no |
-| 2023-05-03 | +1.11 | +1.35 | +1.03 | +24.21 | yes |
-| 2023-06-14 | -2.25 | -2.06 | -2.38 | +0.85 | yes |
-| 2023-07-26 | +0.16 | +0.09 | +0.21 | +24.99 | yes |
-| 2023-09-20 | -0.12 | +0.34 | -0.07 | +0.22 | no |
-| 2023-11-01 | -0.49 | -0.32 | -0.25 | +0.27 | yes |
-| 2023-12-13 | -0.52 | -0.10 | -0.50 | +1.86 | yes |
-| 2024-01-31 | +0.21 | +0.26 | +0.41 | -0.31 | yes |
-| 2024-03-20 | -0.11 | -0.04 | +0.30 | +1.01 | yes |
-| 2024-05-01 | +0.01 | -0.11 | -0.24 | -0.39 | yes |
-| 2024-06-12 | +0.25 | +0.31 | +0.73 | +0.19 | yes |
-| 2024-07-31 | +0.28 | +0.31 | +0.36 | +0.40 | yes |
-| 2024-09-18 | -10.98 | -11.43 | -11.12 | -48.31 | yes |
-| 2024-11-07 | +0.08 | -0.31 | +0.02 | -23.51 | yes |
-| 2024-12-18 | -1.04 | -1.60 | -1.52 | -26.46 | yes |
-| 2025-01-29 | +0.16 | +0.40 | +0.10 | -1.55 | yes |
-| 2025-03-19 | +0.06 | +0.06 | +0.03 | -1.77 | yes |
-| 2025-05-07 | +0.05 | -0.01 | -0.02 | -2.34 | yes |
-| 2025-06-18 | +0.09 | -0.33 | +0.06 | +1.86 | yes |
-| 2025-07-30 | +0.35 | +0.40 | +0.32 | +1.15 | yes |
-| 2025-09-17 | +1.23 | +1.35 | +1.45 | -24.25 | yes |
-| 2025-10-29 | +3.63 | +3.67 | +4.49 | -20.19 | yes |
-| 2025-12-10 | -1.40 | -2.09 | -2.33 | -24.46 | yes |
-| 2026-01-28 | +0.12 | +0.04 | +0.05 | -0.75 | yes |
+| date | 14:15 | 14:45 | 16:00 | level at 16:00 | announced | closing error | usable |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 2022-01-26 | -0.52 | -0.96 | -1.04 | +0.10 | 0 | +0.10 | yes |
+| 2022-03-16 | -2.06 | -1.64 | -2.05 | +26.54 | +25 | +1.54 | no: not fully identified |
+| 2022-05-04 | -1.88 | -1.97 | -1.94 | +50.62 | +50 | +0.62 | yes |
+| 2022-06-15 | +3.49 | +3.61 | +3.77 | +74.14 | +75 | -0.86 | yes |
+| 2022-07-27 | -1.50 | -1.95 | -2.00 | +75.64 | +75 | +0.64 | yes |
+| 2022-09-21 | -3.49 | -3.35 | -3.52 | +75.44 | +75 | +0.44 | no: not fully identified |
+| 2022-11-02 | -0.28 | -0.21 | -0.18 | +76.08 | +75 | +1.08 | yes |
+| 2022-12-14 | -0.10 | -0.08 | -0.48 | +50.93 | +50 | +0.93 | yes |
+| 2023-02-01 | -0.72 | -0.75 | -0.69 | +25.56 | +25 | +0.56 | yes |
+| 2023-03-22 | +3.24 | +3.77 | +3.27 | +24.91 | +25 | -0.09 | no: not fully identified |
+| 2023-05-03 | +1.11 | +1.35 | +1.03 | +24.21 | +25 | -0.79 | yes |
+| 2023-06-14 | -2.25 | -2.06 | -2.38 | +0.85 | 0 | +0.85 | yes |
+| 2023-07-26 | +0.16 | +0.09 | +0.21 | +24.99 | +25 | -0.01 | yes |
+| 2023-09-20 | -0.12 | +0.34 | -0.07 | +0.22 | 0 | +0.22 | no: not fully identified |
+| 2023-11-01 | -0.49 | -0.32 | -0.25 | +0.27 | 0 | +0.27 | yes |
+| 2023-12-13 | -0.52 | -0.10 | -0.50 | +1.86 | 0 | +1.86 | yes |
+| 2024-01-31 | +0.21 | +0.26 | +0.41 | -0.31 | 0 | -0.31 | yes |
+| 2024-03-20 | -0.11 | -0.04 | +0.30 | +1.01 | 0 | +1.01 | yes |
+| 2024-05-01 | +0.01 | -0.11 | -0.24 | -0.39 | 0 | -0.39 | yes |
+| 2024-06-12 | +0.25 | +0.31 | +0.73 | +0.19 | 0 | +0.19 | yes |
+| 2024-07-31 | +0.28 | +0.31 | +0.36 | +0.40 | 0 | +0.40 | yes |
+| 2024-09-18 | -10.98 | -11.43 | -11.12 | -48.31 | -50 | +1.69 | yes |
+| 2024-11-07 | +0.08 | -0.31 | +0.02 | -23.51 | -25 | +1.49 | yes |
+| 2024-12-18 | -1.04 | -1.60 | -1.52 | -26.46 | -25 | -1.46 | yes |
+| 2025-01-29 | +0.16 | +0.40 | +0.10 | -1.55 | 0 | -1.55 | yes |
+| 2025-03-19 | +0.06 | +0.06 | +0.03 | -1.77 | 0 | -1.77 | yes |
+| 2025-05-07 | +0.05 | -0.01 | -0.02 | -2.34 | 0 | -2.34 | no: closing error above 2 bp |
+| 2025-06-18 | +0.09 | -0.33 | +0.06 | +1.86 | 0 | +1.86 | yes |
+| 2025-07-30 | +0.35 | +0.40 | +0.32 | +1.15 | 0 | +1.15 | yes |
+| 2025-09-17 | +1.23 | +1.35 | +1.45 | -24.25 | -25 | +0.75 | yes |
+| 2025-10-29 | +3.63 | +3.67 | +4.49 | -20.19 | -25 | +4.81 | no: closing error above 2 bp |
+| 2025-12-10 | -1.40 | -2.09 | -2.33 | -24.46 | -25 | +0.54 | yes |
+| 2026-01-28 | +0.12 | +0.04 | +0.05 | -0.75 | 0 | -0.75 | yes |
+| 2026-03-18 | +0.36 | -0.01 | +0.83 | +0.53 | 0 | +0.53 | yes |
+| 2026-04-29 | +0.02 | -0.05 | -0.16 | -0.20 | 0 | -0.20 | yes |
 
-Twenty-five of the 33 days move less than 2 bp at horizon 1 between 13:55 and 16:00. The statement usually confirmed a path the book already held. The three afternoons on the path chart are the exceptions worth talking through. Numbers below are the minute path, horizon by horizon. Minute 0 is still the pre-statement book. Minute 1 is the statement. Minute 31 is the press conference.
+### Checking the fit against the announced move
 
-**18 September 2024.** Horizon 1 was already −37.19 bp at 13:55 and −36.00 bp at minute 0. The statement minute prints −47.97 bp. By 14:15 the change versus 13:55 is −10.98 bp, and by 16:00 it is −11.12 bp, with the level at −48.31 bp. The press conference does not take horizon 1 any further (minute 31 is −48.65, minute 120 is −48.31). Horizons 2 and 3 jump in that same first minute and then give a little back: by 16:00 they are −8.48 and −7.11 bp versus 13:55. Read it as a cut the market had mostly priced, with the statement supplying about 11 bp more on the front meeting inside the first minute. Databento flags this day as degraded quality. The fit still has 11 contracts, rank 6, and RMSE 0.33 bp, and it is the largest identified horizon-1 move in the sample, so it stays on the chart with that caveat.
+After the statement, today's move is no longer a forecast, so the fitted horizon-1 level at 16:00 should equal what the Fed announced. `fomc_intraday/evaluation.py` puts the two side by side for every afternoon (`announcement_summary.csv`).
 
-**29 October 2025.** Horizon 1 was −24.68 bp at 13:55 and −24.57 at minute 0. Minute 1 is −22.14, about +2.4 bp, and the book then drifts to −20.19 by 16:00 (+4.49 bp versus 13:55). That is not a one-minute jump. The larger revision is further out, and more of it arrives after the press conference. Horizon 2 goes from −47.10 at minute 31 to −42.75 at minute 45 and −39.55 at minute 120 (+9.77 bp versus 13:55). Horizon 3 ends +10.44 bp versus 13:55.
+- The mean absolute closing error is 0.97 bp (median 0.75, largest 4.81). A repricing smaller than about 1 bp cannot be told apart from fit error.
+- The fitted repricing (16:00 minus 13:55) tracks the true surprise (announced move minus what the 13:55 book had priced) with correlation 0.89 across all 35 afternoons and 0.95 across the 29 usable ones. `surprise_check.png` plots the two against each other.
+- Six afternoons are flagged. Four are one rank short of a unique answer (2022-03-16, 2022-09-21, 2023-03-22, 2023-09-20). Two miss the announced move by more than 2 bp (2025-05-07 by 2.34 bp and 2025-10-29 by 4.81 bp). Flagged afternoons stay in the tables and on the horizon chart. They are left off the path chart and are not described as news.
+- On 25 of the 29 usable afternoons the repricing is under 2 bp. The statement usually confirmed a path the book already held.
 
-**15 June 2022.** Horizon 1 was already +70.37 bp at 13:55. The decision that afternoon was a 75 bp hike, and most of it was in the book before the statement. Minute 1 is +73.46. By 16:00 the change versus 13:55 is +3.77 bp and the level is +74.14. Horizons 2 and 3 ease after the press conference: from minute 15 to minute 45, horizon 2 goes from +150.13 to +140.94 and horizon 3 from +215.34 to +200.92. By 16:00 those changes versus 13:55 are −4.06 and −9.26 bp.
+### The afternoons worth talking through
 
-The other identified days above about 2 bp at horizon 1 are 14 June 2023 (−2.38), 10 December 2025 (−2.33), and 27 July 2022 (−2.00). Three of the unidentified days are also large at horizon 1 (21 September 2022 −3.52, 22 March 2023 +3.27, 16 March 2022 −2.05). With rank 6 against 7 meetings those splits are one solution, so they stay in the table and on the fan, and off the path chart.
+The path chart shows the three usable afternoons with the largest true surprise (`select_headline_events`). Ranking by the largest fitted change instead would pick up fit error as readily as news, as 29 October 2025 shows below. Minute 0 is still the pre-statement book, minute 1 is the statement, and minute 31 is the press conference.
 
-**One day without the SOFR splice.** Published daily SOFR in the team's file starts 2022-01-03. The January 2022 SR1 month starts 2022-01-01, so the pricer refuses to splice realized fixings through that front month. 2022-01-26 is fit with `realized_fixings` left empty. The basis is still the trailing estimate. The day uses 10 contracts, rank 5, and is identified, with RMSE 0.10 bp at 16:00. The other 32 days splice published SOFR. `sofr_pricing` is unchanged.
+**18 September 2024** (surprise −12.81 bp). The Fed cut 50 bp. Horizon 1 was already −37.19 bp at 13:55 and −36.00 bp at minute 0. The statement minute prints −47.97 bp. By 16:00 the change versus 13:55 is −11.12 bp and the level is −48.31 bp, so the fit closes 1.69 bp from the announced −50. The press conference does not take horizon 1 any further (minute 31 is −48.65, minute 120 is −48.31). Horizons 2 and 3 jump in the same first minute and then give a little back: by 16:00 they are −8.48 and −7.11 bp versus 13:55. Read it as a cut the market had mostly priced, with the statement adding about 12 bp on the front meeting inside the first minute. Databento flags this day as degraded quality. The fit still has 11 contracts, rank 6 and RMSE 0.33 bp.
+
+**15 June 2022** (surprise +4.63 bp). The Fed hiked 75 bp and +70.37 bp of it was in the book at 13:55. Minute 1 is +73.46 and the level at 16:00 is +74.14 (closing error −0.86 bp). Horizons 2 and 3 ease after the press conference: from minute 15 to minute 45, horizon 2 goes from +150.13 to +140.94 and horizon 3 from +215.34 to +200.92. By 16:00 those changes versus 13:55 are −4.06 and −9.26 bp.
+
+**14 June 2023** (surprise −3.23 bp). The Fed held, and the 13:55 book still priced +3.23 bp of a hike. Horizon 1 falls to +1.19 bp in the statement minute and settles at +0.85 bp (closing error +0.85 bp), so the hike risk was priced out in the first minute. By 16:00 the changes at horizons 1 to 3 are −2.38, −0.85 and +1.13 bp.
+
+**29 October 2025: a fit artifact, not a hawkish surprise.** The Fed cut 25 bp and the 13:55 book had priced −24.68 bp, a true surprise of −0.32 bp. The fit at 16:00 says −20.19 bp, which is where the +4.49 bp "repricing" comes from, and it misses the announced move by 4.81 bp, the largest closing error in the sample. The most likely cause is the basis. The study holds the SOFR-minus-policy basis fixed across the afternoon at the trailing estimate, 8.2 bp that day. SOFR minus the target midpoint was 8.5 bp on 22 October, 14.5 to 18.5 bp on 27 to 29 October, and 34.5 bp at the month end (31 October), against a median of -4.5 bp from January to September 2025. A fixed basis that is too low reads that as the market pricing less easing. The horizon 2 and 3 changes that day (+9.77 and +10.44 bp) probably carry the same shift, so they are not taken at face value either.
+
+### Where the repricing happens
+
+`repricing_speed.png` and `repricing_window_summary.csv` split every afternoon into clock windows and report the mean absolute change in each, by horizon, across all 35 afternoons (bp).
+
+| window | horizon 1 | horizon 2 | horizon 3 |
+| --- | ---: | ---: | ---: |
+| pre-statement drift (13:55 to 14:00) | 0.24 | 0.33 | 0.48 |
+| statement minute (14:00 to 14:01) | 1.16 | 1.47 | 2.61 |
+| digesting the statement (14:01 to 14:30) | 0.30 | 0.89 | 1.29 |
+| press conference minute (14:30 to 14:31) | 0.08 | 0.18 | 0.30 |
+| after the press conference (14:31 to 16:00) | 0.21 | 2.13 | 3.65 |
+
+Today's meeting reprices almost entirely in the statement minute. Meetings two and three ahead also move in the statement minute, and then move again after the press conference, which is where guidance about the path shows up. These are means of absolute changes, so they include the fit's own noise of about 1 bp, and the windows differ in length. The pre-statement window (13:55 to 14:00, no news) is the nearest thing to a noise baseline.
 
 **Degraded prints.** Databento's dataset condition marks 2024-09-18 and 2025-09-17 as degraded. 17 September 2025 moves +1.45 bp at horizon 1 by 16:00. Both days are in the tables.
 
 Files under `reports/intraday/real/`:
 
-- `repricing_paths.png` — minute path for the three afternoons above, horizons 1–3, with lines at the statement and the press conference.
-- `change_by_horizon.png` — 16:00 minus 13:55, by horizon, one line per announcement. More than eight lines, so the chart has no per-line legend. The note on the figure says the names are in the table.
+- `repricing_speed.png` and `repricing_window_summary.csv` — where the repricing happens, across all afternoons.
+- `surprise_check.png` and `announcement_summary.csv` — the closing check: priced, announced, surprise, repricing, closing error, and why a day is flagged.
+- `repricing_paths.png` — minute path for the three usable afternoons with the largest true surprise, horizons 1 to 3, with lines at the statement and the press conference.
+- `change_by_horizon.png` and `change_by_horizon.csv` — 16:00 minus 13:55, by horizon, one line per announcement. More than eight lines, so the chart has no per-line legend and the names are in the table. `horizon_summary.csv` gives the mean and largest absolute change at each horizon.
 - `snapshot_changes.csv` — every meeting at every snapshot, level and change from 13:55.
-- `minute_paths.csv` — minute-by-minute implied rate for horizons 1–3, all 33 dates (16,800 rows). The path figure draws three of them. The real run writes this file under `reports/intraday/real/`. It is not in the repository. `.gitignore` lists it, and `python scripts/run_intraday_demo.py --real --out reports/intraday/real` regenerates it locally. The full-resolution minute series stays off the public repo because Databento restricts redistribution.
-- `change_by_horizon.csv` — the window-end change table behind the fan.
+- `repricing_windows.csv` — the change in each window for every afternoon and horizon.
+- `minute_paths.csv` — minute-by-minute implied rate for horizons 1 to 3, all 35 dates (17,736 rows). It is not in the repository. `.gitignore` lists it, and `python scripts/run_intraday_demo.py --real --out reports/intraday/real` regenerates it locally. The full-resolution minute series stays off the public repo because Databento restricts redistribution.
 - `fit_diagnostics.csv` — rank, condition number, RMSE, convergence, and whether realized SOFR was spliced.
 
-The committed real tables are the snapshot summaries: `snapshot_changes.csv`, `change_by_horizon.csv`, and `fit_diagnostics.csv`, plus the two figures. None of them holds a futures price. The raw bars stay in gitignored `data/raw/intraday/` and `data/processed/sofr_intraday_ohlcv_1m.parquet`. The Databento key stays in `~/.databento_api_key`. The synthetic drill under `reports/intraday/` is planted by the model, not a Databento pull, and its minute file stays in the repo as the method check.
+The committed real tables are summaries. None of them holds a futures price. The raw bars stay in gitignored `data/raw/intraday/` and `data/processed/sofr_intraday_ohlcv_1m.parquet`. The Databento key stays in `~/.databento_api_key`. The synthetic drill under `reports/intraday/` is planted by the model, not a Databento pull, and its minute file stays in the repo as the method check.
 
 ## Synthetic check
 
@@ -137,19 +164,25 @@ Synthetic check, no key and no network. Writes under `reports/intraday/` and rep
 python scripts/run_intraday_demo.py --out reports/intraday
 ```
 
-Real book. The daily SOFR, EFFR, and FOMC files come from `scripts/fetch_rate_data.py` (no Databento key). The minute bars come from `scripts/fetch_intraday_sofr.py`, which quotes `metadata.get_cost` and stops if the quote is above 5 dollars. `--real` only reads the caches. Point it at `reports/intraday/real` so the drill stays put:
+Real book, in one command from the repository root (after `pip install -r requirements.txt` and saving the key in `~/.databento_api_key`):
 
 ```bash
-PYTHONPATH=. python scripts/fetch_rate_data.py
-python scripts/fetch_intraday_sofr.py --dry-run
-python scripts/fetch_intraday_sofr.py
-python scripts/run_intraday_demo.py --real --out reports/intraday/real
+python scripts/reproduce.py --only rate_data,minute_bars,intraday_study
 ```
 
-`fetch_rate_data.py` needs `PYTHONPATH` set to the repo root; the other two scripts insert it themselves. Tests monkeypatch the socket:
+or step by step. The daily SOFR, EFFR, and FOMC files come from `scripts/fetch_rate_data.py` (no Databento key). The minute bars come from `scripts/fetch_intraday_sofr.py`, which quotes `metadata.get_cost`, stops if the quote is above 5 dollars, retries Databento timeouts, and caches each announcement so a run that stops resumes where it left off. `--real` only reads the caches. Point it at `reports/intraday/real` so the drill stays put:
 
 ```bash
-python -m pytest tests/test_intraday.py -q
+python -m scripts.fetch_rate_data
+python -m scripts.fetch_intraday_sofr --dry-run
+python -m scripts.fetch_intraday_sofr
+python -m scripts.run_intraday_demo --real --out reports/intraday/real
+```
+
+Tests monkeypatch the socket, so they run offline:
+
+```bash
+python -m pytest tests/test_intraday.py tests/test_intraday_evaluation.py -q
 ```
 
 ## Limitations
@@ -160,7 +193,9 @@ python -m pytest tests/test_intraday.py -q
 - **One expected path.** Pricing uses the team's single-path pricer, so the small convexity adjustment is ignored, as in the daily fit.
 - **The statement clock is exact.** A statement that hits the wire a minute late shows up one minute later on this path. Not every meeting's press conference moves the book; the 14:45 snapshot is there either way.
 - **Identification.** Four afternoons are one rank short (7 meetings, rank 6). Their horizon-1 numbers are in the table. The path chart omits them.
-- **January 2022 fixings.** The splice is off for 2022-01-26 only, because published SOFR starts after the front-month window opens. See the note above.
+- **Fit error is real, and is measured.** The fitted level at 16:00 misses the announced move by 0.97 bp on average and by 4.81 bp at worst. Any repricing under about 1 bp is within that. Two afternoons miss by more than 2 bp and are flagged; the basis held fixed across the afternoon is the likely cause on 29 October 2025.
+- **Window means include noise.** The windows in `repricing_window_summary.csv` are means of absolute changes, so they carry the fit's own noise, and they differ in length. Compare them with the pre-statement window, not with zero.
+- **SOFR lead-in.** Published SOFR is fetched from three months before the sample (`SOFR_FETCH_START` in `fomc_data/config.py`), so every afternoon, including 2022-01-26, splices realized fixings.
 - **Degraded days.** Databento marks 2024-09-18 and 2025-09-17 as reduced quality. Both are still in the study.
-- **Calendar tail.** Five 2026 announcements are outside the estimator until the published schedule is extended.
+- **Calendar tail.** Three 2026 announcements (June 17, July 29 and September 16) are outside the estimator. Their strip reaches SR3 contracts that end in 2027, past the last meeting the schedule knows (the announced 2026-10-28 and 2026-12-09 are in `fomc_data.fomc_calendar.UPCOMING_FOMC_DATES`). Adding the 2027 schedule would cover them.
 - **Bar schema.** The pull is `ohlcv-1m` closes, not the trades schema. A one-lot print and a deep print look the same once they are the minute's close.

@@ -70,22 +70,35 @@ def plot_notable_meetings(notable):
                   ("Largest positive bias", "mean_error_bps"),
                   ("Largest negative bias", "mean_error_bps"),]
 
-    labels = []
-    values = []
-    dates = []
+    #a meeting with a single forecast has a mean absolute error equal to the size of its mean
+    #bias, so two bars of the same size for the same meeting say nothing new. Draw it once,
+    #under both names, and keep the sign when one of them is a bias.
+    entries = []
 
     for category, metric in categories:
         if category not in notable.index:
             continue
 
         row = notable.loc[category]
+        meeting = pd.Timestamp(row["meeting_date"])
+        value = float(row[metric])
 
-        labels.append(category)
-        values.append(float(row[metric]))
-        dates.append(pd.Timestamp(row["meeting_date"]).strftime("%b %d, %Y"))
+        for entry in entries:
+            if entry["meeting"] == meeting and abs(abs(entry["value"]) - abs(value)) < 1e-9:
+                entry["names"].append(category)
+                if metric == "mean_error_bps":
+                    entry["value"] = value
+                break
+        else:
+            entries.append({"names": [category], "value": value, "meeting": meeting})
 
-    if not labels:
+    if not entries:
         raise ValueError("No notable meetings available to plot")
+
+    labels = [entry["names"][0] + (f"\n(also: {', '.join(name.lower() for name in entry['names'][1:])})" if len(entry["names"]) > 1 else "")
+              for entry in entries]
+    values = [entry["value"] for entry in entries]
+    dates = [entry["meeting"].strftime("%b %d, %Y") for entry in entries]
 
     #each bar now uses the statistic described by its label.
     colors = [COLORS["orange"] if value < 0 else COLORS["blue"] for value in values]
@@ -102,7 +115,15 @@ def plot_notable_meetings(notable):
     ax.invert_yaxis()
     ax.axvline(0, color = COLORS["gray"], linewidth = 1)
 
-    ax.set_xlabel("Forecast error (bp)")
+    #leave room beyond the longest bar for its value label. Without it a label on a negative
+    #bar runs left over the axis tick labels.
+    low, high = min(values + [0.0]), max(values + [0.0])
+    pad = 0.2 * ((high - low) or 1.0)
+    ax.set_xlim(low - pad if low < 0 else low, high + pad if high > 0 else high)
+
+    # Two bars are a meeting's mean absolute error and two are its signed
+    # mean bias. One axis title has to cover both.
+    ax.set_xlabel("Meeting-level statistic (bp)")
     ax.set_title("Notable FOMC Forecasting Episodes")
     ax.grid(axis = "x", alpha = 0.3)
 
@@ -118,7 +139,7 @@ def plot_notable_meetings(notable):
                     va = "center",
                     fontsize = 9)
 
-    ax.text(0.5, -0.15, "Historical forecasts; categories may refer to the same meeting. " "Some meetings have only one forecast.", 
+    ax.text(0.5, -0.15, "Historical forecasts; categories may refer to the same meeting. " "Some meetings have only one forecast.",
             transform = ax.transAxes, ha = "center", fontsize = 9, color = COLORS["gray"])
 
     fig.tight_layout()
@@ -139,8 +160,8 @@ def plot_meeting_event_study(errors, meeting_date, horizon = 1):
 
     meeting_date = pd.Timestamp(meeting_date)
 
-    data = data[(data["meeting_date"] == meeting_date) 
-                & (data["horizon"] == horizon) 
+    data = data[(data["meeting_date"] == meeting_date)
+                & (data["horizon"] == horizon)
                 & (data["obs_date"] < meeting_date)].sort_values("obs_date")
 
     if data.empty:

@@ -18,6 +18,7 @@ import pandas as pd
 from fomc_intraday.events import contracts_for
 from fomc_intraday.windows import announcement_window, to_utc
 from sofr_data import config
+from sofr_data.retry import call_with_retries
 
 SCHEMA = "ohlcv-1m"
 PROCESSED_NAME = "sofr_intraday_ohlcv_1m.parquet"
@@ -97,7 +98,10 @@ def quote_cost(client, requests):
     """Call `metadata.get_cost` for each request. Does not download bars."""
     rows = []
     for request in requests:
-        cost = client.metadata.get_cost(**request_kwargs(request))
+        cost = call_with_retries(
+            lambda request=request: client.metadata.get_cost(**request_kwargs(request)),
+            label=f"cost quote for {request['announcement_date']}",
+        )
         rows.append({
             "announcement_date": request["announcement_date"],
             "n_symbols": len(request["symbols"]),
@@ -211,7 +215,10 @@ def pull(
 
     frames = list(cached)
     for request in pending:
-        store = client.timeseries.get_range(**request_kwargs(request))
+        store = call_with_retries(
+            lambda request=request: client.timeseries.get_range(**request_kwargs(request)),
+            label=f"minute bars for {request['announcement_date']}",
+        )
         normalized = normalize_ohlcv(store.to_df(), request["announcement_date"], request["contracts"])
         if normalized.empty:
             normalized = _empty_bars()

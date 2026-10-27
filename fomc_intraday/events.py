@@ -17,7 +17,7 @@ is `covered_announcements`.
 
 import pandas as pd
 
-from fomc_data.fomc_calendar import fetch_fomc_calendar
+from fomc_data.fomc_calendar import fetch_fomc_calendar, scheduled_meeting_dates
 from sofr_data.contracts import Contract
 from sofr_pricing import contract_strip, fixing_dates, upcoming_meetings
 
@@ -35,11 +35,16 @@ DEFAULT_N_SR3 = 3
 
 
 def calendar_meeting_dates(start=None, end=None):
-    """Announcement dates from the team's FOMC calendar, oldest first."""
+    """Announcement dates from the team's FOMC calendar, oldest first.
+
+    With no arguments this is the full schedule, including the announced
+    meetings that have not happened yet. The estimator needs those to see
+    a strip that reaches past the last realized meeting. Pass `start` or
+    `end` for the realized calendar only.
+    """
     if start is None and end is None:
-        table = fetch_fomc_calendar()
-    else:
-        table = fetch_fomc_calendar(start, end)
+        return [pd.Timestamp(day).normalize() for day in scheduled_meeting_dates()]
+    table = fetch_fomc_calendar(start, end)
     return [pd.Timestamp(day).normalize() for day in table["meeting_date"]]
 
 

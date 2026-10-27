@@ -451,8 +451,12 @@ def test_covered_announcements_drop_the_tail_of_the_calendar():
     assert covered_set <= set(dates)
     assert pd.Timestamp("2024-06-12") in covered_set
     assert pd.Timestamp("2024-12-18") in covered_set
-    # The calendar ends in September 2026, before a full SR3 strip from
-    # that meeting would finish.
+    # The schedule ends with the announced December 2026 meeting. A strip from
+    # March and April 2026 now fits inside it. A strip from June 2026 on reaches
+    # SR3 contracts that end in 2027, past the last meeting the schedule knows.
+    assert pd.Timestamp("2026-03-18") in covered_set
+    assert pd.Timestamp("2026-04-29") in covered_set
+    assert pd.Timestamp("2026-06-17") not in covered_set
     assert pd.Timestamp("2026-09-16") not in covered_set
     assert covered[-1] < dates[-1]
 

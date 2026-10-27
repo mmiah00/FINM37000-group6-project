@@ -16,23 +16,33 @@ from final_visualizations.model_comparison import summarize_model_comparison
 
 def summarize_forecast_horizons(errors):
     """
-    Summarize MAE, RMSE, and bias by forecast horizon.
+    Summarize n_obs, n_meetings, bias, MAE, and RMSE by forecast horizon.
+
+    ``n_meetings`` is the number of distinct meeting dates behind the rows
+    that enter the three error statistics. Issue #5 reports the same count
+    beside bias, MAE, and RMSE, because forecasts of one meeting share one
+    realized outcome.
 
     Args:
     - errors (pd.DataFrame): Output of Issue #5's build_forecast_errors().
+      Required columns: horizon, meeting_date, error_bps.
 
     Returns (pd.DataFrame): One row per horizon with accuracy statistics.
     """
+    if "meeting_date" not in errors.columns:
+        raise ValueError("forecast errors need meeting_date so the summary can report n_meetings")
+
     rows = []
 
     for horizon, group in errors.groupby("horizon", sort = True):
-        values = group["error_bps"].dropna()
+        scored = group.dropna(subset = ["error_bps"])
 
         rows.append({"horizon": int(horizon),
-                     "n_obs": len(values),
-                     "mae_bps": values.abs().mean(),
-                     "rmse_bps": np.sqrt((values**2).mean()),
-                     "bias_bps": values.mean()})
+                     "n_obs": int(len(scored)),
+                     "n_meetings": int(scored["meeting_date"].nunique()),
+                     "bias_bps": scored["error_bps"].mean(),
+                     "mae_bps": scored["error_bps"].abs().mean(),
+                     "rmse_bps": np.sqrt((scored["error_bps"]**2).mean())})
 
     return pd.DataFrame(rows).set_index("horizon")
 
@@ -42,14 +52,22 @@ def format_summary_table(summary, index_name):
     Format an accuracy summary for presentation.
 
     Keeps the numerical summary separate from the formatted output.
+    Meetings sits beside N, bias, MAE, and RMSE when the summary has it.
     """
     table = summary.copy().reset_index()
+    label = "Horizon" if index_name == "horizon" else "Method"
 
-    table = table.rename(columns = {index_name: "Horizon" if index_name == "horizon" else "Method",
+    table = table.rename(columns = {index_name: label,
                                     "n_obs": "N",
+                                    "n_meetings": "Meetings",
                                     "mae_bps": "MAE (bp)",
                                     "rmse_bps": "RMSE (bp)",
                                     "bias_bps": "Bias (bp)"})
+
+    preferred = [label, "N", "Meetings", "Bias (bp)", "MAE (bp)", "RMSE (bp)"]
+    ordered = [column for column in preferred if column in table.columns]
+    extras = [column for column in table.columns if column not in ordered]
+    table = table[ordered + extras]
 
     for column in ["MAE (bp)", "RMSE (bp)", "Bias (bp)"]:
         table[column] = table[column].map(lambda value: f"{value:.2f}")

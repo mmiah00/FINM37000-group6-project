@@ -5,6 +5,10 @@
     dashed line marks the 14:30 press conference.
 (b) The announcement-day change by meeting horizon: window-end path
     minus the 13:55 path, for every announcement in the sample.
+(c) Fitted repricing against the announced surprise, one point per
+    announcement: a check that the fit recovers the news (real runs only).
+(d) Mean absolute change in each clock window around the statement, by
+    horizon: how fast and how large the repricing is across the sample.
 
 The caller saves the figure (`fig.savefig(...)`). Titles say "synthetic
 check" when the bars were generated rather than observed, so a chart
@@ -135,3 +139,79 @@ def snapshot_change_table(snapshots, snapshot="post_1600", max_horizon=6):
     keep = [column for column in columns if column in frame.columns]
     ordered = frame.sort_values(["announcement_date", "horizon"])
     return ordered.loc[:, keep].reset_index(drop=True)
+
+
+def plot_surprise_check(summary, tolerance_bps=2.0):
+    """Fitted repricing against the announced surprise, one point per afternoon.
+
+    The x axis is the news with no fit on the announced side: the announced move
+    minus what the 13:55 book had priced. The y axis is what the study reports,
+    the fitted level at 16:00 minus the fitted level at 13:55. Points on the
+    diagonal are afternoons where the fit recovered the news. A point off the
+    band is fit error, not a market reaction, and is labelled.
+    """
+    fig, axis = plt.subplots(figsize=(6.8, 6.2))
+    usable = summary.loc[summary["flag"] == ""]
+    flagged = summary.loc[summary["flag"] != ""]
+
+    span = max(float(summary["surprise"].abs().max()), float(summary["repricing"].abs().max()), 1.0) * 1.1
+    axis.plot([-span, span], [-span, span], color="0.3", linewidth=1.0, label="fit equals the surprise")
+    axis.fill_between(
+        [-span, span], [-span - tolerance_bps, span - tolerance_bps], [-span + tolerance_bps, span + tolerance_bps],
+        color="0.5", alpha=0.15, label=f"within {tolerance_bps:g} bp",
+    )
+    axis.scatter(usable["surprise"], usable["repricing"], s=36, color="tab:blue", zorder=3, label="usable afternoon")
+    axis.scatter(
+        flagged["surprise"], flagged["repricing"], s=52, facecolors="none", edgecolors="tab:red",
+        linewidths=1.6, zorder=3, label="flagged (fit error or not identified)",
+    )
+    for index, row in enumerate(flagged.sort_values("surprise").itertuples(index=False)):
+        #alternate above and below so labels of nearby points do not overlap.
+        offset = (6, 8) if index % 2 else (6, -12)
+        axis.annotate(str(row.label), (row.surprise, row.repricing), textcoords="offset points", xytext=offset, fontsize=7)
+    axis.axhline(0, color="0.7", linewidth=0.6)
+    axis.axvline(0, color="0.7", linewidth=0.6)
+    axis.set_xlim(-span, span)
+    axis.set_ylim(-span, span)
+    axis.set_aspect("equal")
+    axis.set_xlabel("Surprise: announced move minus the 13:55 book (bp)")
+    axis.set_ylabel("Fitted repricing: 16:00 minus 13:55 (bp)")
+    axis.set_title("Does the fitted repricing recover the announced surprise?")
+    axis.grid(alpha=0.3)
+    axis.legend(loc="upper left", fontsize=8)
+    fig.tight_layout()
+    return fig
+
+
+def plot_repricing_windows(window_table, synthetic=False):
+    """Mean absolute change in each clock window, by horizon: how fast and how large.
+
+    `window_table` is `fomc_intraday.evaluation.window_summary`. Absolute values, so
+    afternoons that move in opposite directions are not averaged away.
+    """
+    if window_table.empty:
+        raise ValueError("no window rows to plot")
+    windows = list(dict.fromkeys(window_table["window"]))
+    horizons = sorted(window_table["horizon"].unique())
+    height = 0.8 / len(horizons)
+
+    fig, axis = plt.subplots(figsize=(9.5, 4.6))
+    for offset, horizon in enumerate(horizons):
+        rows = window_table.loc[window_table["horizon"] == horizon].set_index("window").reindex(windows)
+        positions = [index + offset * height for index in range(len(windows))]
+        bars = axis.barh(positions, rows["mean_abs_bps"], height=height * 0.92, label=f"Horizon {int(horizon)}")
+        axis.bar_label(bars, fmt="%.1f", padding=2, fontsize=7)
+    axis.set_yticks([index + height * (len(horizons) - 1) / 2 for index in range(len(windows))])
+    axis.set_yticklabels(windows, fontsize=8)
+    axis.invert_yaxis()
+    axis.set_xlim(0, float(window_table["mean_abs_bps"].max()) * 1.18)  # room for the value label of the longest bar
+    axis.set_xlabel("Mean absolute change in the implied cumulative path (bp)")
+    n_events = int(window_table["n_events"].max())
+    title = f"Where the repricing happens, around the 14:00 statement ({n_events} announcements)"
+    if synthetic:
+        title = "Synthetic check: " + title
+    axis.set_title(title, fontsize=10)
+    axis.grid(axis="x", alpha=0.3)
+    axis.legend(loc="upper right", fontsize=8)
+    fig.tight_layout()
+    return fig

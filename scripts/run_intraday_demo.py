@@ -35,10 +35,21 @@ matplotlib.use("Agg")
 import pandas as pd  # noqa: E402
 
 from fomc_intraday import calendar_meeting_dates  # noqa: E402
+from fomc_intraday.evaluation import (  # noqa: E402
+    TOLERANCE_BPS,
+    announcement_summary,
+    horizon_summary,
+    noise_floor,
+    select_headline_events,
+    window_changes,
+    window_summary,
+)
 from fomc_intraday.fetch import processed_path  # noqa: E402
 from fomc_intraday.plots import (  # noqa: E402
     plot_change_by_horizon,
     plot_repricing_paths,
+    plot_repricing_windows,
+    plot_surprise_check,
     snapshot_change_table,
 )
 from fomc_intraday.study import (  # noqa: E402
@@ -184,11 +195,16 @@ def run_real():
             print(f"  {study.snapshots['label'].iloc[0]}  {note}", flush=True)
             studies.append(study)
     snapshots, minutes, diagnostics = stack_studies(studies)
-    return snapshots, minutes, diagnostics
+    return snapshots, minutes, diagnostics, decisions
 
 
 def _path_labels(snapshots, diagnostics, limit=3):
-    """Up to `limit` fully identified announcements with the largest horizon-1 move.
+    """Fallback when no decisions are available: identified afternoons with the largest fitted move.
+
+    With the decision table, `select_headline_events` is used instead: it ranks by
+    the true surprise and leaves out afternoons where the fit misses the announced
+    move. This version ranks by the fitted change alone, which cannot tell news
+    from fit error.
 
     The path chart has up to three afternoons. The horizon chart and the
     tables keep the whole sample. A day that is not full rank stays in
@@ -205,14 +221,22 @@ def _path_labels(snapshots, diagnostics, limit=3):
     return list(ranked.sort_values("abs_move", ascending=False)["label"].head(limit))
 
 
-def write_outputs(out, snapshots, minutes, diagnostics, synthetic, truths=None):
-    """Write available figures and the tables. Returns the max synthetic error, or None."""
+def write_outputs(out, snapshots, minutes, diagnostics, synthetic, truths=None, decisions=None):
+    """Write available figures and the tables. Returns the max synthetic error, or None.
+
+    With `decisions` (real runs) it also checks each afternoon against the announced
+    move and writes the summaries across afternoons. See `fomc_intraday.evaluation`.
+    """
     directory = Path(out)
     directory.mkdir(parents=True, exist_ok=True)
 
+    summary = None
+    if decisions is not None and not synthetic:
+        summary = announcement_summary(snapshots, diagnostics, decisions)
+
     path_minutes = minutes
     if not synthetic:
-        labels = _path_labels(snapshots, diagnostics)
+        labels = select_headline_events(summary) if summary is not None else _path_labels(snapshots, diagnostics)
         path_minutes = minutes.loc[minutes["label"].isin(labels)]
         # Keep the chart in the same order as the ranking, not file order.
         path_minutes = path_minutes.copy()
@@ -223,7 +247,10 @@ def write_outputs(out, snapshots, minutes, diagnostics, synthetic, truths=None):
         paths.savefig(path_file, dpi=150)
     else:
         path_file.unlink(missing_ok=True)
-        print("Skipped repricing_paths.png: no fully identified afternoon at 16:00.")
+        if summary is not None:
+            print("Skipped repricing_paths.png: no afternoon is both fully identified and closing within tolerance.")
+        else:
+            print("Skipped repricing_paths.png: no fully identified afternoon at 16:00.")
     changes = plot_change_by_horizon(snapshots, synthetic=synthetic)
     changes.savefig(directory / "change_by_horizon.png", dpi=150)
 
@@ -232,11 +259,38 @@ def write_outputs(out, snapshots, minutes, diagnostics, synthetic, truths=None):
     diagnostics.to_csv(directory / "fit_diagnostics.csv", index=False)
     snapshot_change_table(snapshots).to_csv(directory / "change_by_horizon.csv", index=False)
 
+    if summary is not None:
+        _write_sample_summaries(directory, summary, snapshots, minutes)
+
     worst = None
     if truths is not None:
         _truth_rows(truths).to_csv(directory / "synthetic_truth.csv", index=False)
         worst = _max_abs_error(snapshots, truths)
     return worst
+
+
+def _write_sample_summaries(directory, summary, snapshots, minutes):
+    """Tables and charts that look across every afternoon rather than at a few."""
+    changes = window_changes(minutes)
+    windows = window_summary(changes)
+
+    summary.to_csv(directory / "announcement_summary.csv", index=False)
+    horizon_summary(snapshots).to_csv(directory / "horizon_summary.csv")
+    changes.to_csv(directory / "repricing_windows.csv", index=False)
+    windows.to_csv(directory / "repricing_window_summary.csv", index=False)
+
+    plot_surprise_check(summary, TOLERANCE_BPS).savefig(directory / "surprise_check.png", dpi=150)
+    if not windows.empty:
+        plot_repricing_windows(windows).savefig(directory / "repricing_speed.png", dpi=150)
+
+
+def print_sample_summary(summary):
+    """What the closing check found, in words and numbers."""
+    flagged = summary.loc[summary["flag"] != ""]
+    print(f"\nClosing check, {len(summary)} afternoons: the fitted 16:00 level should equal the announced move.")
+    print(f"  Mean absolute closing error {noise_floor(summary):.2f} bp (the noise floor for any single repricing).")
+    print(f"  Flagged {len(flagged)}: " + (", ".join(f"{row.label} ({row.flag})" for row in flagged.itertuples()) or "none"))
+    print("  Headline afternoons, by true surprise among the usable ones: " + ", ".join(select_headline_events(summary)))
 
 
 def main(argv=None):
@@ -246,11 +300,11 @@ def main(argv=None):
 
     if args.real:
         try:
-            snapshots, minutes, diagnostics = run_real()
+            snapshots, minutes, diagnostics, decisions = run_real()
         except FileNotFoundError as error:
             print(f"\n{error}\n", file=sys.stderr)
             return 2
-        worst = write_outputs(args.out, snapshots, minutes, diagnostics, synthetic=False)
+        worst = write_outputs(args.out, snapshots, minutes, diagnostics, synthetic=False, decisions=decisions)
         print("REAL minute bars. Figures are market data, not the synthetic check.\n")
     else:
         snapshots, minutes, diagnostics, truths = run_synthetic()
@@ -264,6 +318,8 @@ def main(argv=None):
     print("\nFit diagnostics:")
     columns = ["label", "snapshot", "n_contracts", "n_meetings", "rmse_bps", "fully_identified", "converged"]
     print(diagnostics.loc[:, columns].to_string(index=False))
+    if args.real:
+        print_sample_summary(announcement_summary(snapshots, diagnostics, decisions))
     print(f"\nWrote figures and tables under {args.out}")
     return 0
 
